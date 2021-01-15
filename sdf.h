@@ -8,7 +8,6 @@
 extern "C"
 {
 #endif
-
 	/*device manage*/
 	int SDF_OpenDevice(void **phDeviceHandle);
 	int SDF_CloseDevice(void *hDeviceHandle);

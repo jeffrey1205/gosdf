@@ -10,10 +10,16 @@ func TestSm3(t *testing.T) {
 
 	if err := SdfInit("/home/go-test/ccore/libsdf_crypto.so"); err != nil {
 		fmt.Println("sdf init error:", err)
+		return
 	}
+	defer SdfExit()
 
 	session := SdfOpenSession()
-	fmt.Println("sdf session:", session)
+	if session == 0 {
+		fmt.Println("sdf open session error")
+		return
+	}
+	defer SdfCloseSession(session)
 
 	ret := SdfSm3Init(session)
 	fmt.Println("sdf sm3 init:", ret)
@@ -27,9 +33,4 @@ func TestSm3(t *testing.T) {
 		hashStr += fmt.Sprintf("%02X", hash[i])
 	}
 	fmt.Printf("sdf sm3 final ret %d, hash: %s\n", ret, hashStr)
-
-	ret = SdfCloseSession(session)
-	fmt.Println("sdf close session:", session, ret)
-
-	SdfExit()
 }
