@@ -188,7 +188,6 @@ int plugin_init(char *path)
 			goto error;
 		}
 
-		printf("%s addr %p\n", gs_func_name_arr[i].name, sym);
 		*gs_func_name_arr[i].func = sym;
 	}
 
