@@ -12,112 +12,50 @@ static void *gs_sdf_device = NULL; //加密设备
 static void *gs_lib_handle = NULL; //so库
 
 //设备管理
-typedef int (* OPEN_DEVICE)(void **);
-OPEN_DEVICE OpenDevice;
-
-typedef int (* CLOSE_DEVICE)(void *);
-CLOSE_DEVICE CloseDevice;
-
-typedef int (* OPEN_SESSION)(void *, void **);
-OPEN_SESSION OpenSession;
-
-typedef int (* CLOSE_SESSION)(void *);
-CLOSE_SESSION CloseSession;
+int (* OpenDevice)(void **);
+int (* CloseDevice)(void *);
+int (* OpenSession)(void *, void **);
+int (* CloseSession)(void *);
 
 //杂凑运算
-typedef int (* HASH_INIT)(void *, unsigned int, ECCrefPublicKey *, unsigned char *, unsigned int);
-HASH_INIT HashInit;
-
-typedef int (* HASH_UPDATE)(void *, unsigned char *, unsigned int);
-HASH_UPDATE HashUpdate;
-
-typedef int (* HASH_FINAL)(void *, unsigned char *, unsigned int *);
-HASH_FINAL HashFinal;
+int (* HashInit)(void *, unsigned int, ECCrefPublicKey *, unsigned char *, unsigned int);
+int (* HashUpdate)(void *, unsigned char *, unsigned int);
+int (* HashFinal)(void *, unsigned char *, unsigned int *);
 
 //密钥管理
-typedef int (*ExportSignPublicKey_ECC)(void *, unsigned int, ECCrefPublicKey *);
-ExportSignPublicKey_ECC ExportSignPublicKeyECC;
-
-typedef int (*ExportEncPublicKey_ECC)(void *, unsigned int, ECCrefPublicKey *);
-ExportEncPublicKey_ECC ExportEncPublicKeyECC;
-
-typedef int (*GenerateKeyPair_ECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *,ECCrefPrivateKey *);
-GenerateKeyPair_ECC GenerateKeyPairECC;
-
-typedef int (*GenerateKeyWithIPK_ECC)(void *, unsigned int, unsigned int, ECCCipher *, void **);
-GenerateKeyWithIPK_ECC GenerateKeyWithIPKECC;
-
-typedef int (*GenerateKeyWithEPK_ECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *, ECCCipher *, void **);
-GenerateKeyWithEPK_ECC GenerateKeyWithEPKECC;
-
-typedef int (*ImportKeyWithISK_ECC)(void *, unsigned int, ECCCipher *, void **);
-ImportKeyWithISK_ECC ImportKeyWithISKECC;
-
-typedef int (*GenerateAgreementData_ECC)(void *, unsigned int, unsigned int, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, void **);
-GenerateAgreementData_ECC GenerateAgreementDataWithECC;
-
-typedef int (*GenerateKey_ECC)(void *, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, void *, void **);
-GenerateKey_ECC GenerateKeyWithECC;
-
-typedef int (*GenerateAgreementDataAndKey_ECC)(void *, unsigned int, unsigned int, unsigned char *, unsigned int, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, ECCrefPublicKey *, ECCrefPublicKey *, void *, void **);
-GenerateAgreementDataAndKey_ECC GenerateAgreementDataAndKeyWithECC;
-
-typedef int (*ExchangeDigitEnvelope_ECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *, ECCCipher *, ECCCipher *);
-ExchangeDigitEnvelope_ECC ExchangeDigitEnvelopeBaseOnECC;
-
-typedef int (*Import_Key)(void *, unsigned char *, unsigned int , void **);
-Import_Key ImportKey;
-
-typedef int (*Destroy_Key)(void *, void *);
-Destroy_Key DestroyKey;
+int (*ExportSignPublicKeyECC)(void *, unsigned int, ECCrefPublicKey *);
+int (*ExportEncPublicKeyECC)(void *, unsigned int, ECCrefPublicKey *);
+int (*GenerateKeyPairECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *,ECCrefPrivateKey *);
+int (*GenerateKeyWithIPKECC)(void *, unsigned int, unsigned int, ECCCipher *, void **);
+int (*GenerateKeyWithEPKECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *, ECCCipher *, void **);
+int (*ImportKeyWithISKECC)(void *, unsigned int, ECCCipher *, void **);
+int (*GenerateAgreementDataWithECC)(void *, unsigned int, unsigned int, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, void **);
+int (*GenerateKeyWithECC)(void *, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, void *, void **);
+int (*GenerateAgreementDataAndKeyWithECC)(void *, unsigned int, unsigned int, unsigned char *, unsigned int, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, ECCrefPublicKey *, ECCrefPublicKey *, void *, void **);
+int (*ExchangeDigitEnvelopeBaseOnECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *, ECCCipher *, ECCCipher *);
+int (*ImportKey)(void *, unsigned char *, unsigned int , void **);
+int (*DestroyKey)(void *, void *);
 
 //非对称运算
-typedef int (*ExternalSign_ECC)(void *, unsigned int, ECCrefPrivateKey *, unsigned char *, unsigned int, ECCSignature *);
-ExternalSign_ECC ExternalSignECC;
-
-typedef int (*ExternalVerify_ECC)(void *, unsigned int, ECCrefPublicKey *, unsigned char *, unsigned int, ECCSignature *);
-ExternalVerify_ECC ExternalVerifyECC;
-
-typedef int (*InternalSign_ECC)(void *, unsigned int, unsigned char *, unsigned int, ECCSignature *);
-InternalSign_ECC InternalSignECC;
-
-typedef int (*InternalVerify_ECC)(void *, unsigned int, unsigned char *, unsigned int, ECCSignature *);
-InternalVerify_ECC InternalVerifyECC;
-
-typedef int (*ExternalEncrypt_ECC)(void *, unsigned int, ECCrefPublicKey *,unsigned char *, unsigned int, ECCCipher *);
-ExternalEncrypt_ECC ExternalEncryptECC;
-
-typedef int (*ExternalDecrypt_ECC)(void *, unsigned int, ECCrefPrivateKey *, ECCCipher *, unsigned char *, unsigned int *);
-ExternalDecrypt_ECC ExternalDecryptECC;
-
-typedef int (*InternalEncrypt_ECC)(void *, unsigned int, unsigned char *, unsigned int, ECCCipher *);
-InternalEncrypt_ECC InternalEncryptECC;
-
-typedef int (*InternalDecrypt_ECC)(void *, unsigned int, ECCCipher *, unsigned char *, unsigned int *);
-InternalDecrypt_ECC InternalDecryptECC;
+int (*ExternalSignECC)(void *, unsigned int, ECCrefPrivateKey *, unsigned char *, unsigned int, ECCSignature *);
+int (*ExternalVerifyECC)(void *, unsigned int, ECCrefPublicKey *, unsigned char *, unsigned int, ECCSignature *);
+int (*InternalSignECC)(void *, unsigned int, unsigned char *, unsigned int, ECCSignature *);
+int (*InternalVerifyECC)(void *, unsigned int, unsigned char *, unsigned int, ECCSignature *);
+int (*ExternalEncryptECC)(void *, unsigned int, ECCrefPublicKey *,unsigned char *, unsigned int, ECCCipher *);
+int (*ExternalDecryptECC)(void *, unsigned int, ECCrefPrivateKey *, ECCCipher *, unsigned char *, unsigned int *);
+int (*InternalEncryptECC)(void *, unsigned int, unsigned char *, unsigned int, ECCCipher *);
+int (*InternalDecryptECC)(void *, unsigned int, ECCCipher *, unsigned char *, unsigned int *);
 
 //对称运算
-typedef int (*ENCRYPT)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
-ENCRYPT Encrypt;
-
-typedef int (*DECRYPT)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
-DECRYPT Decrypt;
-
-typedef int (*Calculate_MAC)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
-Calculate_MAC CalculateMAC;
+int (*Encrypt)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
+int (*Decrypt)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
+int (*CalculateMAC)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
 
 //文件管理
-typedef int (*Create_File)(void *, unsigned char *, unsigned int, unsigned int);
-Create_File CreateFile;
-
-typedef int (*Read_File)(void *, unsigned char *, unsigned int, unsigned int, unsigned int *, unsigned char *);
-Read_File ReadFile;
-
-typedef int (*Write_File)(void *, unsigned char *, unsigned int, unsigned int, unsigned int, unsigned char *);
-Write_File WriteFile;
-
-typedef int (*Delete_File)(void *, unsigned char *, unsigned int);
-Delete_File DeleteFile;
+int (*CreateFile)(void *, unsigned char *, unsigned int, unsigned int);
+int (*ReadFile)(void *, unsigned char *, unsigned int, unsigned int, unsigned int *, unsigned char *);
+int (*WriteFile)(void *, unsigned char *, unsigned int, unsigned int, unsigned int, unsigned char *);
+int (*DeleteFile)(void *, unsigned char *, unsigned int);
 
 struct func_name_pair
 {
@@ -308,14 +246,14 @@ func SdfSm3Final(session int64) (int32, [32]byte) {
 	return int32(C.hash_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])), (*C.unsigned)(unsafe.Pointer(&len)))), hash
 }
 
-//SdfExternalSignEcc:外部密钥ECC签名, alg:C.SGD_SM2 or C.SGD_RSA
-func SdfExternalSignEcc(session int64, alg uint32, privKey ECCrefPrivateKey, buf []byte, len uint32) (int32, ECCSignature) {
+//SdfSm2ExtKeySign:sm2外部key签名
+func SdfSm2ExtKeySign(session int64, privKey ECCrefPrivateKey, buf []byte, len uint32) (int32, ECCSignature) {
 	var sig ECCSignature
 
-	return int32(C.external_sign_ecc(C.long(session), C.unsigned(alg), (*C.ECCrefPrivateKey)(unsafe.Pointer(&privKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig)))), sig
+	return int32(C.external_sign_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPrivateKey)(unsafe.Pointer(&privKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig)))), sig
 }
 
-//SdfExternalVerifyEcc:外部密钥ECC签名, alg:C.SGD_SM2 or C.SGD_RSA
-func SdfExternalVerifyEcc(session int64, alg uint32, pubKey ECCrefPublicKey, buf []byte, len uint32, sig ECCSignature) int32 {
-	return int32(C.external_verify_ecc(C.long(session), C.unsigned(alg), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig))))
+//SdfSm2ExtKeyVerify:sm2外部key验签
+func SdfSm2ExtKeyVerify(session int64, pubKey ECCrefPublicKey, buf []byte, len uint32, sig ECCSignature) int32 {
+	return int32(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }

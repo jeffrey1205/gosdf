@@ -173,9 +173,9 @@ typedef struct SlotKeyInfo_st
 #else //V_GMT0006
 #define SGD_RSA 0x00010000
 #define SGD_SM2 0x00020000
-#define SGD_SM2_1 0x00020200
-#define SGD_SM2_2 0x00020400
-#define SGD_SM2_3 0x00020800
+#define SGD_SM2_1 0x00020200 //签名
+#define SGD_SM2_2 0x00020400 //密钥交换
+#define SGD_SM2_3 0x00020800 //加解密
 #endif
 
 #define SGD_SM3 0x00000001
