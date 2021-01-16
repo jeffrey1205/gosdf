@@ -12,15 +12,15 @@ static void *gs_sdf_device = NULL; //加密设备
 static void *gs_lib_handle = NULL; //so库
 
 //设备管理
-int (* OpenDevice)(void **);
-int (* CloseDevice)(void *);
-int (* OpenSession)(void *, void **);
-int (* CloseSession)(void *);
+int (*OpenDevice)(void **);
+int (*CloseDevice)(void *);
+int (*OpenSession)(void *, void **);
+int (*CloseSession)(void *);
 
 //杂凑运算
-int (* HashInit)(void *, unsigned int, ECCrefPublicKey *, unsigned char *, unsigned int);
-int (* HashUpdate)(void *, unsigned char *, unsigned int);
-int (* HashFinal)(void *, unsigned char *, unsigned int *);
+int (*HashInit)(void *, unsigned int, ECCrefPublicKey *, unsigned char *, unsigned int);
+int (*HashUpdate)(void *, unsigned char *, unsigned int);
+int (*HashFinal)(void *, unsigned char *, unsigned int *);
 
 //密钥管理
 int (*ExportSignPublicKeyECC)(void *, unsigned int, ECCrefPublicKey *);
