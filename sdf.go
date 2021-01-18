@@ -197,6 +197,26 @@ int external_verify_ecc(long session, unsigned int alg, ECCrefPublicKey *key, un
 {
 	return ExternalVerifyECC((void *)session, alg, key, buf, buf_len, sig);
 }
+
+int create_file(long session, unsigned char *name, unsigned int name_len, unsigned int size)
+{
+	return CreateFile((void *)session, name, name_len, size);
+}
+
+int read_file(long session, unsigned char *name, unsigned int name_len, unsigned int offset, unsigned int *file_len, unsigned char *buf)
+{
+	return ReadFile((void *)session, name, name_len, offset, file_len, buf);
+}
+
+int write_file(long session, unsigned char *name, unsigned int name_len, unsigned int offset, unsigned int file_len, unsigned char *buf)
+{
+	return WriteFile((void *)session, name, name_len, offset, file_len, buf);
+}
+
+int delete_file(long session, unsigned char *name, unsigned int name_len)
+{
+	return DeleteFile((void *)session, name, name_len);
+}
 */
 import "C"
 import (
@@ -256,4 +276,29 @@ func SdfSm2ExtKeySign(session int64, privKey ECCrefPrivateKey, buf []byte, len u
 //SdfSm2ExtKeyVerify:sm2外部key验签
 func SdfSm2ExtKeyVerify(session int64, pubKey ECCrefPublicKey, buf []byte, len uint32, sig ECCSignature) int32 {
 	return int32(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig))))
+}
+
+//SdfCreateFile:卡中创建文件
+func SdfCreateFile(session int64, fileName string, fileSize uint32) int32 {
+	buf := make([]byte, len(fileName))
+	return int32(C.create_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName)), C.unsigned(fileSize)))
+}
+
+//SdfReadFile:读取卡中文件,从offset开始读取readLen字节
+func SdfReadFile(session int64, fileName string, offSet, readLen uint32) (int32, []byte) {
+	fileBytes := make([]byte, len(fileName))
+	buf := make([]byte, readLen) //读取文件buf
+	return int32(C.read_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), (*C.unsigned)(unsafe.Pointer(&readLen)), (*C.uchar)(unsafe.Pointer(&buf[0])))), buf
+}
+
+//SdfWriteFile:文件写入内容,从offset开始写入readLen字节
+func SdfWriteFile(session int64, fileName string, offSet, writeLen uint32, buf []byte) int32 {
+	fileBytes := make([]byte, len(fileName))
+	return int32(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(writeLen), (*C.uchar)(unsafe.Pointer(&buf[0]))))
+}
+
+//SdfDeleteFile:删除卡中文件
+func SdfDeleteFile(session int64, fileName string) int32 {
+	buf := make([]byte, len(fileName))
+	return int32(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName))))
 }
