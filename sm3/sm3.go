@@ -12,6 +12,11 @@ type SM3 struct {
 	session int64
 }
 
+// 关闭session
+func (sm3 *SM3) Close() {
+	gosdf.SdfCloseSession(sm3.session)
+}
+
 // 创建哈希计算实例
 func New() hash.Hash {
 	session := gosdf.SdfOpenSession()

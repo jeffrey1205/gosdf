@@ -1,26 +1,11 @@
 package gosdf
 
 import (
-	"crypto/hmac"
 	"fmt"
 	"testing"
-
-	"gitee.com/zhujingfeng/gosdf/sm3"
 )
 
 var enginePath string = "./libsdf_crypto.so"
-
-func TestSm3Hash(t *testing.T) {
-	if err := SdfInit(enginePath); err != nil {
-		fmt.Println("SDF init error:", err)
-		return
-	}
-	defer SdfExit()
-
-	sm3 := sm3.New()
-	sm3.Write([]byte("test"))
-	fmt.Printf("SM3 Hash: %x\n", sm3.Sum(nil))
-}
 
 func TestSm3(t *testing.T) {
 	if err := SdfInit(enginePath); err != nil {
@@ -48,16 +33,4 @@ func TestSm3(t *testing.T) {
 
 	ret, hash := SdfSm3Final(session)
 	fmt.Printf("SM3 Final ret %d, hash: %x\n", ret, hash)
-}
-
-func TestHmacSm3(t *testing.T) {
-	if err := SdfInit(enginePath); err != nil {
-		fmt.Println("SDF Init error:", err)
-		return
-	}
-	defer SdfExit()
-
-	mac := hmac.New(sm3.New, []byte("123456"))
-	mac.Write([]byte("test"))
-	fmt.Printf("HMAC-SM3: %x\n", mac.Sum(nil))
 }
