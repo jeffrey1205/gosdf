@@ -4,6 +4,8 @@ import (
 	"crypto/hmac"
 	"fmt"
 	"testing"
+
+	"gitee.com/zhujingfeng/gosdf/sm3"
 )
 
 var enginePath string = "./libsdf_crypto.so"
@@ -15,7 +17,7 @@ func TestSm3Hash(t *testing.T) {
 	}
 	defer SdfExit()
 
-	sm3 := New()
+	sm3 := sm3.New()
 	sm3.Write([]byte("test"))
 	fmt.Printf("SM3 Hash: %x\n", sm3.Sum(nil))
 }
@@ -55,7 +57,7 @@ func TestHmacSm3(t *testing.T) {
 	}
 	defer SdfExit()
 
-	mac := hmac.New(New, []byte("123456"))
+	mac := hmac.New(sm3.New, []byte("123456"))
 	mac.Write([]byte("test"))
 	fmt.Printf("HMAC-SM3: %x\n", mac.Sum(nil))
 }

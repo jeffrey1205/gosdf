@@ -1,28 +1,25 @@
-package gosdf
+package sm3
 
 import (
 	"fmt"
 	"hash"
 	"runtime"
+
+	"gitee.com/zhujingfeng/gosdf"
 )
 
 type SM3 struct {
 	session int64
 }
 
-// 关闭session
-func (sm3 *SM3) Close() {
-	SdfCloseSession(sm3.session)
-}
-
 // 创建哈希计算实例
 func New() hash.Hash {
-	session := SdfOpenSession()
+	session := gosdf.SdfOpenSession()
 	if session == 0 {
 		return nil
 	}
 
-	if ret := SdfSm3Init(session); ret != 0 {
+	if ret := gosdf.SdfSm3Init(session); ret != 0 {
 		return nil
 	}
 
@@ -45,7 +42,7 @@ func (sm3 *SM3) Reset() {
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
 	toWrite := len(p)
-	if ret := SdfSm3Update(sm3.session, p, uint32(toWrite)); ret != 0 {
+	if ret := gosdf.SdfSm3Update(sm3.session, p, uint32(toWrite)); ret != 0 {
 		return 0, fmt.Errorf("sm3 update error: %d", ret)
 	}
 
@@ -53,7 +50,7 @@ func (sm3 *SM3) Write(p []byte) (int, error) {
 }
 
 func (sm3 *SM3) Sum(in []byte) []byte {
-	ret, hash := SdfSm3Final(sm3.session)
+	ret, hash := gosdf.SdfSm3Final(sm3.session)
 	if ret != 0 {
 		return nil
 	}
