@@ -9,22 +9,22 @@ import (
 )
 
 type SM3 struct {
-	session int64
+	session int
 }
 
 // 关闭session
 func (sm3 *SM3) Close() {
-	gosdf.SdfCloseSession(sm3.session)
+	gosdf.CloseSession(sm3.session)
 }
 
 // 创建哈希计算实例
 func New() hash.Hash {
-	session := gosdf.SdfOpenSession()
-	if session == 0 {
+	session, ret := gosdf.OpenSession()
+	if ret != 0 {
 		return nil
 	}
 
-	if ret := gosdf.SdfSm3Init(session); ret != 0 {
+	if ret := gosdf.Sm3Init(session); ret != 0 {
 		return nil
 	}
 
@@ -47,7 +47,7 @@ func (sm3 *SM3) Reset() {
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
 	toWrite := len(p)
-	if ret := gosdf.SdfSm3Update(sm3.session, p, uint32(toWrite)); ret != 0 {
+	if ret := gosdf.Sm3Update(sm3.session, p, uint32(toWrite)); ret != 0 {
 		return 0, fmt.Errorf("sm3 update error: %d", ret)
 	}
 
@@ -55,7 +55,7 @@ func (sm3 *SM3) Write(p []byte) (int, error) {
 }
 
 func (sm3 *SM3) Sum(in []byte) []byte {
-	ret, hash := gosdf.SdfSm3Final(sm3.session)
+	hash, ret := gosdf.Sm3Final(sm3.session)
 	if ret != 0 {
 		return nil
 	}

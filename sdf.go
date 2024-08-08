@@ -154,18 +154,9 @@ void plugin_exit(void)
 		dlclose(gs_lib_handle);
 }
 
-long open_session(void)
+int open_session(void *session)
 {
-	int ret;
-	void *session;
-
-	ret = OpenSession(gs_sdf_device, &session);
-	if (ret != 0)
-	{
-		return 0;
-	}
-
-	return (long)session;
+	return OpenSession(gs_sdf_device, &session);
 }
 
 int close_session(long session)
@@ -224,8 +215,8 @@ import (
 	"unsafe"
 )
 
-// SdfInit:模块初始化,打开device、so库,查找符号表
-func SdfInit(libPath string) error {
+// Init:模块初始化,打开device、so库,查找符号表
+func Init(libPath string) error {
 	if ret := C.plugin_init(C.CString(libPath)); ret != 0 {
 		return fmt.Errorf("sdf_sym_init error: %d", ret)
 	}
@@ -233,72 +224,80 @@ func SdfInit(libPath string) error {
 	return nil
 }
 
-// SdfExit:模块退出
-func SdfExit() {
+// Exit:模块退出
+func Exit() {
 	C.plugin_exit()
 }
 
-// SdfOpenSession:打开会话,成功返回session_id >0,失败返回0
-func SdfOpenSession() int64 {
-	return int64(C.open_session())
+// OpenSession:打开会话,成功返回session_id >0,失败返回0和错误码
+func OpenSession() (int, int32) {
+	var session C.long
+	ret := C.open_session(unsafe.Pointer(&session))
+	return int(session), int32(ret)
 }
 
-// SdfCloseSession:关闭会话
-func SdfCloseSession(session int64) int32 {
+// CloseSession:关闭会话
+func CloseSession(session int) int32 {
 	return int32(C.close_session(C.long(session)))
 }
 
-// SdfSm3Init:sm3 init，传入打开的会话
-func SdfSm3Init(session int64) int32 {
+// Sm3Init:sm3 init，传入打开的会话
+func Sm3Init(session int) int32 {
 	return int32(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3)))
 }
 
-// SdfSm3Update:sm3 update
-func SdfSm3Update(session int64, buf []byte, len uint32) int32 {
+// Sm3Update:sm3 update
+func Sm3Update(session int, buf []byte, len uint32) int32 {
 	return int32(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), (C.unsigned)(len)))
 }
 
 // SdfSm3Update:sm3 final，返回32字节的hash数组
-func SdfSm3Final(session int64) (int32, []byte) {
+func Sm3Final(session int) ([]byte, int32) {
 	var len C.unsigned = 32
 	hash := make([]byte, 32)
 
-	return int32(C.hash_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])), (*C.unsigned)(unsafe.Pointer(&len)))), hash
+	ret := C.hash_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])), (*C.unsigned)(unsafe.Pointer(&len)))
+
+	return hash, int32(ret)
 }
 
-// SdfSm2ExtKeySign:sm2外部key签名
-func SdfSm2ExtKeySign(session int64, privKey ECCrefPrivateKey, buf []byte, len uint32) (int32, ECCSignature) {
+// Sm2ExtKeySign:sm2外部key签名
+func Sm2ExtKeySign(session int, privKey ECCrefPrivateKey, buf []byte, len uint32) (ECCSignature, int32) {
 	var sig ECCSignature
 
-	return int32(C.external_sign_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPrivateKey)(unsafe.Pointer(&privKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig)))), sig
+	ret := C.external_sign_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPrivateKey)(unsafe.Pointer(&privKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig)))
+	return sig, int32(ret)
 }
 
-// SdfSm2ExtKeyVerify:sm2外部key验签
-func SdfSm2ExtKeyVerify(session int64, pubKey ECCrefPublicKey, buf []byte, len uint32, sig ECCSignature) int32 {
+// Sm2ExtKeyVerify:sm2外部key验签
+func Sm2ExtKeyVerify(session int, pubKey ECCrefPublicKey, buf []byte, len uint32, sig ECCSignature) int32 {
 	return int32(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }
 
-// SdfCreateFile:卡中创建文件
-func SdfCreateFile(session int64, fileName string, fileSize uint32) int32 {
+// CreateFile:卡中创建文件
+func CreateFile(session int, fileName string, fileSize uint32) int32 {
 	buf := make([]byte, len(fileName))
 	return int32(C.create_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName)), C.unsigned(fileSize)))
 }
 
-// SdfReadFile:读取卡中文件,从offset开始读取readLen字节
-func SdfReadFile(session int64, fileName string, offSet, readLen uint32) (int32, []byte) {
+// ReadFile:读取卡中文件,从offset开始读取readLen字节
+func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, int32) {
 	fileBytes := make([]byte, len(fileName))
 	buf := make([]byte, readLen) //读取文件buf
-	return int32(C.read_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), (*C.unsigned)(unsafe.Pointer(&readLen)), (*C.uchar)(unsafe.Pointer(&buf[0])))), buf
+
+	ret := C.read_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), (*C.unsigned)(unsafe.Pointer(&readLen)), (*C.uchar)(unsafe.Pointer(&buf[0])))
+
+	return buf, int32(ret)
 }
 
-// SdfWriteFile:文件写入内容,从offset开始写入readLen字节
-func SdfWriteFile(session int64, fileName string, offSet, writeLen uint32, buf []byte) int32 {
+// WriteFile:文件写入内容,从offset开始写入readLen字节
+func WriteFile(session int, fileName string, offSet, writeLen uint32, buf []byte) int32 {
 	fileBytes := make([]byte, len(fileName))
 	return int32(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(writeLen), (*C.uchar)(unsafe.Pointer(&buf[0]))))
 }
 
-// SdfDeleteFile:删除卡中文件
-func SdfDeleteFile(session int64, fileName string) int32 {
+// DeleteFile:删除卡中文件
+func DeleteFile(session int, fileName string) int32 {
 	buf := make([]byte, len(fileName))
 	return int32(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName))))
 }
