@@ -57,6 +57,9 @@ int (*ReadFile)(void *, unsigned char *, unsigned int, unsigned int, unsigned in
 int (*WriteFile)(void *, unsigned char *, unsigned int, unsigned int, unsigned int, unsigned char *);
 int (*DeleteFile)(void *, unsigned char *, unsigned int);
 
+// 随机数
+int (*GenerateRandom)(void *, unsigned int, unsigned char *);
+
 struct func_name_pair
 {
 	char name[64]; 	//函数名
@@ -107,6 +110,8 @@ int plugin_init(char *path)
 		{"SDF_ReadFile", (long **)&ReadFile},
 		{"SDF_WriteFile", (long **)&WriteFile},
 		{"SDF_DeleteFile", (long **)&DeleteFile},
+
+		{"SDF_GenerateRandom", (long **)&GenerateRandom},
 	};
 
 	gs_lib_handle = dlopen(path, RTLD_LAZY);
@@ -208,6 +213,11 @@ int delete_file(long session, unsigned char *name, unsigned int name_len)
 {
 	return DeleteFile((void *)session, name, name_len);
 }
+
+int gen_random(long session, unsigned int len, unsigned char *buf)
+{
+	return GenerateRandom((void *)session, len, buf);
+}
 */
 import "C"
 import (
@@ -300,4 +310,11 @@ func WriteFile(session int, fileName string, offSet, writeLen uint32, buf []byte
 func DeleteFile(session int, fileName string) int32 {
 	buf := make([]byte, len(fileName))
 	return int32(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName))))
+}
+
+// GenerateRandom:生成随机数
+func GenerateRandom(session, len int) ([]byte, int32) {
+	buf := make([]byte, len)
+	ret := C.gen_random(C.long(session), C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0])))
+	return buf, int32(ret)
 }
