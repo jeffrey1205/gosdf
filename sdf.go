@@ -313,8 +313,14 @@ func DeleteFile(session int, fileName string) int32 {
 }
 
 // GenerateRandom:生成随机数
-func GenerateRandom(session, len int) ([]byte, int32) {
+func GenerateRandom(len int) ([]byte, int32) {
+	session, ret := OpenSession()
+	if ret != 0 {
+		return nil, ret
+	}
+	defer CloseSession(session)
+
 	buf := make([]byte, len)
-	ret := C.gen_random(C.long(session), C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0])))
-	return buf, int32(ret)
+	ret = int32(C.gen_random(C.long(session), C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
+	return buf, ret
 }
