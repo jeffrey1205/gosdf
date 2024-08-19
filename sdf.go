@@ -257,8 +257,8 @@ func Sm3Init(session int) SDR {
 }
 
 // Sm3Update:sm3 update
-func Sm3Update(session int, buf []byte, len uint32) SDR {
-	return SDR(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), (C.unsigned)(len)))
+func Sm3Update(session int, buf []byte) SDR {
+	return SDR(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(buf))))
 }
 
 // SdfSm3Update:sm3 final，返回32字节的hash数组
@@ -272,16 +272,16 @@ func Sm3Final(session int) ([]byte, SDR) {
 }
 
 // Sm2ExtKeySign:sm2外部key签名
-func Sm2ExtKeySign(session int, privKey ECCrefPrivateKey, buf []byte, len uint32) (ECCSignature, SDR) {
+func Sm2ExtKeySign(session int, privKey ECCrefPrivateKey, buf []byte) (ECCSignature, SDR) {
 	var sig ECCSignature
 
-	ret := C.external_sign_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPrivateKey)(unsafe.Pointer(&privKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig)))
+	ret := C.external_sign_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPrivateKey)(unsafe.Pointer(&privKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(buf)), (*C.ECCSignature)(unsafe.Pointer(&sig)))
 	return sig, SDR(ret)
 }
 
 // Sm2ExtKeyVerify:sm2外部key验签
-func Sm2ExtKeyVerify(session int, pubKey ECCrefPublicKey, buf []byte, len uint32, sig ECCSignature) SDR {
-	return SDR(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig))))
+func Sm2ExtKeyVerify(session int, pubKey ECCrefPublicKey, buf []byte, sig ECCSignature) SDR {
+	return SDR(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(buf)), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }
 
 // CreateFile:卡中创建文件
@@ -301,9 +301,9 @@ func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, SDR
 }
 
 // WriteFile:文件写入内容,从offset开始写入readLen字节
-func WriteFile(session int, fileName string, offSet, writeLen uint32, buf []byte) SDR {
+func WriteFile(session int, fileName string, offSet uint32, buf []byte) SDR {
 	fileBytes := make([]byte, len(fileName))
-	return SDR(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(writeLen), (*C.uchar)(unsafe.Pointer(&buf[0]))))
+	return SDR(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(len(buf)), (*C.uchar)(unsafe.Pointer(&buf[0]))))
 }
 
 // DeleteFile:删除卡中文件

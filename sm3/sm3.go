@@ -47,7 +47,7 @@ func (sm3 *SM3) Reset() {
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
 	toWrite := len(p)
-	if ret := gosdf.Sm3Update(sm3.session, p, uint32(toWrite)); ret != 0 {
+	if ret := gosdf.Sm3Update(sm3.session, p); ret != 0 {
 		return 0, fmt.Errorf("sm3 update error: %d", ret)
 	}
 
@@ -61,4 +61,14 @@ func (sm3 *SM3) Sum(in []byte) []byte {
 	}
 
 	return hash
+}
+
+func Sm3Sum(data []byte) []byte {
+	sm3 := New()
+	if sm3 == nil {
+		return nil
+	}
+
+	_, _ = sm3.Write(data)
+	return sm3.Sum(nil)
 }

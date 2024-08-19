@@ -47,27 +47,27 @@ const (
 )
 
 type ECCrefPublicKey struct {
-	bits uint32
-	x    [ECCref_MAX_LEN]byte
-	y    [ECCref_MAX_LEN]byte
+	Bits uint32
+	X    [ECCref_MAX_LEN]byte
+	Y    [ECCref_MAX_LEN]byte
 }
 
 type ECCrefPrivateKey struct {
-	bits uint32
+	Bits uint32
 	K    [ECCref_MAX_LEN]byte
 }
 
 type ECCCipher struct {
-	x [ECCref_MAX_LEN]byte
-	y [ECCref_MAX_LEN]byte
+	X [ECCref_MAX_LEN]byte
+	Y [ECCref_MAX_LEN]byte
 	M [32]byte
 	L uint32
 	C [1]byte
 }
 
 type ECCSignature struct {
-	r [ECCref_MAX_LEN]byte
-	s [ECCref_MAX_LEN]byte
+	R [ECCref_MAX_LEN]byte
+	S [ECCref_MAX_LEN]byte
 }
 
 type ECCPUBLICKEYBLOB struct {
