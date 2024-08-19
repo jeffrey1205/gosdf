@@ -240,80 +240,80 @@ func Exit() {
 }
 
 // OpenSession:打开会话,成功返回session_id >0,失败返回0和错误码
-func OpenSession() (int, int32) {
+func OpenSession() (int, SDR) {
 	var session C.long
 	ret := C.open_session(unsafe.Pointer(&session))
-	return int(session), int32(ret)
+	return int(session), SDR(ret)
 }
 
 // CloseSession:关闭会话
-func CloseSession(session int) int32 {
-	return int32(C.close_session(C.long(session)))
+func CloseSession(session int) SDR {
+	return SDR(C.close_session(C.long(session)))
 }
 
 // Sm3Init:sm3 init，传入打开的会话
-func Sm3Init(session int) int32 {
-	return int32(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3)))
+func Sm3Init(session int) SDR {
+	return SDR(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3)))
 }
 
 // Sm3Update:sm3 update
-func Sm3Update(session int, buf []byte, len uint32) int32 {
-	return int32(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), (C.unsigned)(len)))
+func Sm3Update(session int, buf []byte, len uint32) SDR {
+	return SDR(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), (C.unsigned)(len)))
 }
 
 // SdfSm3Update:sm3 final，返回32字节的hash数组
-func Sm3Final(session int) ([]byte, int32) {
+func Sm3Final(session int) ([]byte, SDR) {
 	var len C.unsigned = 32
 	hash := make([]byte, 32)
 
 	ret := C.hash_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])), (*C.unsigned)(unsafe.Pointer(&len)))
 
-	return hash, int32(ret)
+	return hash, SDR(ret)
 }
 
 // Sm2ExtKeySign:sm2外部key签名
-func Sm2ExtKeySign(session int, privKey ECCrefPrivateKey, buf []byte, len uint32) (ECCSignature, int32) {
+func Sm2ExtKeySign(session int, privKey ECCrefPrivateKey, buf []byte, len uint32) (ECCSignature, SDR) {
 	var sig ECCSignature
 
 	ret := C.external_sign_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPrivateKey)(unsafe.Pointer(&privKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig)))
-	return sig, int32(ret)
+	return sig, SDR(ret)
 }
 
 // Sm2ExtKeyVerify:sm2外部key验签
-func Sm2ExtKeyVerify(session int, pubKey ECCrefPublicKey, buf []byte, len uint32, sig ECCSignature) int32 {
-	return int32(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig))))
+func Sm2ExtKeyVerify(session int, pubKey ECCrefPublicKey, buf []byte, len uint32, sig ECCSignature) SDR {
+	return SDR(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }
 
 // CreateFile:卡中创建文件
-func CreateFile(session int, fileName string, fileSize uint32) int32 {
+func CreateFile(session int, fileName string, fileSize uint32) SDR {
 	buf := make([]byte, len(fileName))
-	return int32(C.create_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName)), C.unsigned(fileSize)))
+	return SDR(C.create_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName)), C.unsigned(fileSize)))
 }
 
 // ReadFile:读取卡中文件,从offset开始读取readLen字节
-func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, int32) {
+func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, SDR) {
 	fileBytes := make([]byte, len(fileName))
 	buf := make([]byte, readLen) //读取文件buf
 
 	ret := C.read_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), (*C.unsigned)(unsafe.Pointer(&readLen)), (*C.uchar)(unsafe.Pointer(&buf[0])))
 
-	return buf, int32(ret)
+	return buf, SDR(ret)
 }
 
 // WriteFile:文件写入内容,从offset开始写入readLen字节
-func WriteFile(session int, fileName string, offSet, writeLen uint32, buf []byte) int32 {
+func WriteFile(session int, fileName string, offSet, writeLen uint32, buf []byte) SDR {
 	fileBytes := make([]byte, len(fileName))
-	return int32(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(writeLen), (*C.uchar)(unsafe.Pointer(&buf[0]))))
+	return SDR(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])), C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(writeLen), (*C.uchar)(unsafe.Pointer(&buf[0]))))
 }
 
 // DeleteFile:删除卡中文件
-func DeleteFile(session int, fileName string) int32 {
+func DeleteFile(session int, fileName string) SDR {
 	buf := make([]byte, len(fileName))
-	return int32(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName))))
+	return SDR(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName))))
 }
 
 // GenerateRandom:生成随机数
-func GenerateRandom(len int) ([]byte, int32) {
+func GenerateRandom(len int) ([]byte, SDR) {
 	session, ret := OpenSession()
 	if ret != 0 {
 		return nil, ret
@@ -321,6 +321,6 @@ func GenerateRandom(len int) ([]byte, int32) {
 	defer CloseSession(session)
 
 	buf := make([]byte, len)
-	ret = int32(C.gen_random(C.long(session), C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
+	ret = SDR(C.gen_random(C.long(session), C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
 	return buf, ret
 }
