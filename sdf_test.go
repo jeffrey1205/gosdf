@@ -15,19 +15,19 @@ func TestSm3(t *testing.T) {
 	defer Exit()
 
 	session, ret := OpenSession()
-	if ret != 0 {
+	if ret != SDR_OK {
 		fmt.Println("SDF Open Session error")
 		return
 	}
 	defer CloseSession(session)
 
-	if ret := Sm3Init(session); ret != 0 {
+	if ret := Sm3Init(session); ret != SDR_OK {
 		fmt.Println("SM3 Init error:", ret)
 		return
 	}
 
 	//55E12E91650D2FEC56EC74E1D3E4DDBFCE2EF3A65890C2A19ECF88A307E76A23
-	if ret := Sm3Update(session, []byte("test")); ret != 0 {
+	if ret := Sm3Update(session, []byte("test")); ret != SDR_OK {
 		fmt.Println("SM3 Update error:", ret)
 	}
 
