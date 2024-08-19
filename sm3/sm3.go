@@ -20,11 +20,11 @@ func (sm3 *SM3) Close() {
 // 创建哈希计算实例
 func New() hash.Hash {
 	session, ret := gosdf.OpenSession()
-	if ret != 0 {
+	if ret != gosdf.SDR_OK {
 		return nil
 	}
 
-	if ret := gosdf.Sm3Init(session); ret != 0 {
+	if ret := gosdf.Sm3Init(session); ret != gosdf.SDR_OK {
 		return nil
 	}
 
@@ -46,17 +46,16 @@ func (sm3 *SM3) Reset() {
 }
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
-	toWrite := len(p)
-	if ret := gosdf.Sm3Update(sm3.session, p); ret != 0 {
+	if ret := gosdf.Sm3Update(sm3.session, p); ret != gosdf.SDR_OK {
 		return 0, fmt.Errorf("sm3 update error: %d", ret)
 	}
 
-	return toWrite, nil
+	return len(p), nil
 }
 
 func (sm3 *SM3) Sum(in []byte) []byte {
 	hash, ret := gosdf.Sm3Final(sm3.session)
-	if ret != 0 {
+	if ret != gosdf.SDR_OK {
 		return nil
 	}
 

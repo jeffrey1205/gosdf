@@ -159,9 +159,12 @@ void plugin_exit(void)
 		dlclose(gs_lib_handle);
 }
 
-int open_session(void *session)
+long open_session(int *ret)
 {
-	return OpenSession(gs_sdf_device, &session);
+	void *session = NULL;
+
+	*ret = OpenSession(gs_sdf_device, &session);
+	return (long)session;
 }
 
 int close_session(long session)
@@ -241,8 +244,8 @@ func Exit() {
 
 // OpenSession:打开会话,成功返回session_id >0,失败返回0和错误码
 func OpenSession() (int, SDR) {
-	var session C.long
-	ret := C.open_session(unsafe.Pointer(&session))
+	var ret C.int
+	session := C.open_session((*C.int)(unsafe.Pointer(&ret)))
 	return int(session), SDR(ret)
 }
 
