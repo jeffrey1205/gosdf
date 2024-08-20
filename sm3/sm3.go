@@ -21,11 +21,11 @@ func (sm3 *SM3) Close() {
 func New() hash.Hash {
 	session, ret := gosdf.OpenSession()
 	if ret != gosdf.SDR_OK {
-		return nil
+		panic("open session error: " + fmt.Sprint(ret))
 	}
 
 	if ret := gosdf.Sm3Init(session); ret != gosdf.SDR_OK {
-		return nil
+		panic(fmt.Sprintf("session %d init error: %d", session, ret))
 	}
 
 	sm3 := &SM3{session: session}
@@ -43,6 +43,7 @@ func (sm3 *SM3) BlockSize() int { return 64 }
 func (sm3 *SM3) Size() int { return 32 }
 
 func (sm3 *SM3) Reset() {
+	// 是否需要重新调用sm3init？
 }
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
@@ -56,7 +57,7 @@ func (sm3 *SM3) Write(p []byte) (int, error) {
 func (sm3 *SM3) Sum(in []byte) []byte {
 	hash, ret := gosdf.Sm3Final(sm3.session)
 	if ret != gosdf.SDR_OK {
-		return nil
+		panic(fmt.Sprintf("session %d final error: %d", sm3.session, ret))
 	}
 
 	return hash
@@ -64,10 +65,6 @@ func (sm3 *SM3) Sum(in []byte) []byte {
 
 func Sm3Sum(data []byte) []byte {
 	sm3 := New()
-	if sm3 == nil {
-		return nil
-	}
-
 	_, _ = sm3.Write(data)
 	return sm3.Sum(nil)
 }
