@@ -31,7 +31,7 @@ typedef short BOOL;
 
 typedef unsigned char	 u8;
 typedef unsigned short	u16;
-typedef unsigned int	 u32;
+typedef unsigned int	u32;
 typedef unsigned long ULONG;
 typedef unsigned char BYTE;
 typedef char * LPSTR;
@@ -40,7 +40,5 @@ typedef unsigned char * PBYTE;
 typedef int INT_PTR;
 
 #define NULL_PTR ((void *)0)
-
-//#include <xchar.h>
 
 #endif /* __BASE_TYPE_DEF_H__ */

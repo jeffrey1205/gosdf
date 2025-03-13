@@ -294,7 +294,8 @@ func Sm3InitWithPubKey(session int, pubKey ECCrefPublicKey, id []byte) SDR {
 
 // Sm3Update:sm3 update
 func Sm3Update(session int, buf []byte) SDR {
-	return SDR(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(buf))))
+	return SDR(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
+		C.unsigned(len(buf))))
 }
 
 // SdfSm3Update:sm3 final，返回32字节的hash数组
@@ -302,20 +303,22 @@ func Sm3Final(session int) ([]byte, SDR) {
 	var len C.unsigned = 32
 	hash := make([]byte, 32)
 
-	ret := C.hash_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])), (*C.unsigned)(unsafe.Pointer(&len)))
+	ret := C.hash_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])),
+		(*C.unsigned)(unsafe.Pointer(&len)))
 
 	return hash, SDR(ret)
 }
 
-// GenerateKeyWithKEK: 生成会话密钥并导出
+// GenerateKeyWithKEK: 生成会话密钥并导出,密钥会用PKCS7填充
 func GenerateKeyWithKEK(session int, kekIndex uint32, keyBits uint32) ([]byte, int, SDR) {
-	buf := make([]byte, (keyBits+7)/8)
+	buf := make([]byte, 256)
 	var keyLen C.unsigned
 	var ret C.int
 
-	handle := C.gen_key_with_kek(C.long(session), C.unsigned(keyBits), C.unsigned(C.SGD_SMS4_ECB),
-		C.unsigned(kekIndex), (*C.uchar)(unsafe.Pointer(&buf[0])),
-		(*C.unsigned)(unsafe.Pointer(&keyLen)), (*C.int)(unsafe.Pointer(&ret)))
+	handle := C.gen_key_with_kek(C.long(session), C.unsigned(keyBits),
+		C.unsigned(C.SGD_SMS4_ECB), C.unsigned(kekIndex),
+		(*C.uchar)(unsafe.Pointer(&buf[0])), (*C.unsigned)(unsafe.Pointer(&keyLen)),
+		(*C.int)(unsafe.Pointer(&ret)))
 	if ret != 0 {
 		return nil, 0, SDR(ret)
 	}
@@ -329,8 +332,9 @@ func GenerateKeyWithKEK(session int, kekIndex uint32, keyBits uint32) ([]byte, i
 func ImportKeyWithKEK(session int, kekIndex uint32, key []byte) (int, SDR) {
 	var ret C.int
 
-	handle := C.import_key_with_kek(C.long(session), C.unsigned(C.SGD_SMS4_ECB), C.unsigned(kekIndex),
-		(*C.uchar)(unsafe.Pointer(&key[0])), C.unsigned(len(key)), (*C.int)(unsafe.Pointer(&ret)))
+	handle := C.import_key_with_kek(C.long(session), C.unsigned(C.SGD_SMS4_ECB),
+		C.unsigned(kekIndex), (*C.uchar)(unsafe.Pointer(&key[0])),
+		C.unsigned(len(key)), (*C.int)(unsafe.Pointer(&ret)))
 
 	return int(handle), SDR(ret)
 }
@@ -340,47 +344,53 @@ func DestroyKey(session, keyHandle int) SDR {
 	return SDR(C.destroy_key(C.long(session), C.long(keyHandle)))
 }
 
-// SM4EncryptECB:sm4加密，ECB模式，调用者填充
+// SM4EncryptECB:sm4加密，ECB模式，调用者须填充
 func SM4EncryptECB(session, key int, data []byte) ([]byte, SDR) {
 	outBuf := make([]byte, len(data))
-	var outLen C.unsigned
+	iv := make([]byte, 16)
+	var outLen C.unsigned = 0
 
-	ret := C.encrypt(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_ECB), nil,
-		(*C.uchar)(unsafe.Pointer(&data[0])), C.unsigned(len(data)),
-		(*C.uchar)(unsafe.Pointer(&outBuf[0])), (*C.unsigned)(unsafe.Pointer(&outLen)))
+	ret := C.encrypt(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_ECB),
+		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
+		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
+		(*C.unsigned)(unsafe.Pointer(&outLen)))
 	return outBuf, SDR(ret)
 }
 
-// SM4EncryptCBC:sm4加密，CBC模式，调用者填充
-func SM4EncryptCBC(session, key int, data, iv []byte) ([]byte, SDR) {
+// SM4EncryptCBC:sm4加密，CBC模式，调用者须填充
+func SM4EncryptCBC(session, key int, iv, data []byte) ([]byte, SDR) {
 	outBuf := make([]byte, len(data))
-	var outLen C.unsigned
+	var outLen C.unsigned = 0
 
 	ret := C.encrypt(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_CBC),
-		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])), C.unsigned(len(data)),
-		(*C.uchar)(unsafe.Pointer(&outBuf[0])), (*C.unsigned)(unsafe.Pointer(&outLen)))
+		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
+		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
+		(*C.unsigned)(unsafe.Pointer(&outLen)))
 	return outBuf, SDR(ret)
 }
 
 // SM4DecryptECB:sm4解密，ECB模式
 func SM4DecryptECB(session, key int, data []byte) ([]byte, SDR) {
 	outBuf := make([]byte, len(data))
-	var outLen C.unsigned
+	iv := make([]byte, 16)
+	var outLen C.unsigned = 0
 
-	ret := C.decrypt(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_ECB), nil,
-		(*C.uchar)(unsafe.Pointer(&data[0])), C.unsigned(len(data)),
-		(*C.uchar)(unsafe.Pointer(&outBuf[0])), (*C.unsigned)(unsafe.Pointer(&outLen)))
+	ret := C.decrypt(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_ECB),
+		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
+		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
+		(*C.unsigned)(unsafe.Pointer(&outLen)))
 	return outBuf, SDR(ret)
 }
 
 // SM4DecryptCBC:sm4解密，CBC模式
-func SM4DecryptCBC(session, key int, data, iv []byte) ([]byte, SDR) {
+func SM4DecryptCBC(session, key int, iv, data []byte) ([]byte, SDR) {
 	outBuf := make([]byte, len(data))
-	var outLen C.unsigned
+	var outLen C.unsigned = 0
 
 	ret := C.decrypt(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_CBC),
-		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])), C.unsigned(len(data)),
-		(*C.uchar)(unsafe.Pointer(&outBuf[0])), (*C.unsigned)(unsafe.Pointer(&outLen)))
+		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
+		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
+		(*C.unsigned)(unsafe.Pointer(&outLen)))
 	return outBuf, SDR(ret)
 }
 
@@ -404,7 +414,8 @@ func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, SDR
 	buf := make([]byte, readLen) //读取文件buf
 
 	ret := C.read_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])),
-		C.unsigned(len(fileName)), C.unsigned(offSet), (*C.unsigned)(unsafe.Pointer(&readLen)),
+		C.unsigned(len(fileName)), C.unsigned(offSet),
+		(*C.unsigned)(unsafe.Pointer(&readLen)),
 		(*C.uchar)(unsafe.Pointer(&buf[0])))
 
 	return buf, SDR(ret)
@@ -421,7 +432,8 @@ func WriteFile(session int, fileName string, offSet uint32, buf []byte) SDR {
 // DeleteFile:删除卡中文件
 func DeleteFile(session int, fileName string) SDR {
 	buf := make([]byte, len(fileName))
-	return SDR(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(fileName))))
+	return SDR(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
+		C.unsigned(len(fileName))))
 }
 
 // GenerateRandom:生成随机数
