@@ -223,6 +223,11 @@ int decrypt(long session, long key, u32 alg, BYTE *iv, BYTE *data, u32 data_len,
 	return Decrypt((HANDLE)session, (HANDLE)key, alg, iv, data, data_len, out_buf, out_len);
 }
 
+int cbc_mac(long session, long key, u32 alg, BYTE *iv, BYTE *data, u32 data_len, BYTE *out_buf, u32 *out_len)
+{
+	return CalculateMAC((HANDLE)session, (HANDLE)key, alg, iv, data, data_len, out_buf, out_len);
+}
+
 int create_file(long session, unsigned char *name, unsigned int name_len, unsigned int size)
 {
 	return CreateFile((void *)session, name, name_len, size);
@@ -391,6 +396,19 @@ func SM4DecryptCBC(session, key int, iv, data []byte) ([]byte, SDR) {
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
+	return outBuf, SDR(ret)
+}
+
+// 计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
+func SM4CalculateCBCMAC(session, key int, iv []byte, data []byte) ([]byte, SDR) {
+	outBuf := make([]byte, 16) // SM4 CBC-MAC固定16字节
+	var outLen C.unsigned = 0
+
+	ret := C.cbc_mac(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_CBC),
+		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
+		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
+		(*C.unsigned)(unsafe.Pointer(&outLen)))
+
 	return outBuf, SDR(ret)
 }
 

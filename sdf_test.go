@@ -11,7 +11,7 @@ var enginePath string = "./libsdf_crypto.so"
 
 func TestSm3(t *testing.T) {
 	if err := Init(enginePath); err != nil {
-		fmt.Printf("SDF Init error: %x\n", err)
+		fmt.Println("SDF Init error:", err)
 		return
 	}
 	defer Exit()
@@ -103,6 +103,53 @@ func TestSm4Dec(t *testing.T) {
 	cipherText, _ = hex.DecodeString("91788d836d8ffb35e58d9ffbc572a956")
 	plainText, ret = SM4DecryptCBC(session, keyHandle, []byte("1234567890abcdef"), cipherText)
 	fmt.Printf("cbc plain: %s, ret: %x\n", plainText, ret)
+
+	DestroyKey(session, keyHandle)
+}
+
+func TestSm4MAC(t *testing.T) {
+	if err := Init(enginePath); err != nil {
+		fmt.Println("SDF Init error:", err)
+		return
+	}
+	defer Exit()
+
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		fmt.Printf("SDF Open Session error: %x\n", ret)
+		return
+	}
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	keyByte, _ := hex.DecodeString("d9d858ba5784328e95c420c35c4873442ed6392531e1c149d2ff5696b2352018")
+	keyHandle, ret := ImportKeyWithKEK(session, 1, keyByte)
+	if ret != SDR_OK {
+		fmt.Printf("SDF ImportKeyWithKEK error: %x\n", ret)
+		CloseSession(session)
+		return
+	}
+
+	fmt.Printf("key: %x\n", keyHandle)
+
+	// 加密两个分组,IV设置为0,最后一个密文分组即为MAC
+	iv := make([]byte, 16)                                  // IV设置为0
+	plainText := []byte("test1111test1111test1111test1111") // 加密两个分组
+	cipherText, ret := SM4EncryptCBC(session, keyHandle, iv, plainText)
+	fmt.Printf("cbc cipher: %x, ret: %x\n", cipherText, ret)
+
+	// 一次计算两个分组的MAC
+	iv = make([]byte, 16) // IV设置为0
+	mac, ret := SM4CalculateCBCMAC(session, keyHandle, iv, plainText)
+	fmt.Printf("cbc mac: %x, ret: %x\n", mac, ret)
+
+	// 分两步计算两个分组的MAC
+	iv = make([]byte, 16) // IV设置为0
+	mac, ret = SM4CalculateCBCMAC(session, keyHandle, iv, plainText[:16])
+	fmt.Printf("cbc mac 1: %x, ret: %x\n", mac, ret)
+	mac, ret = SM4CalculateCBCMAC(session, keyHandle, mac, plainText[16:])
+	fmt.Printf("cbc mac 2: %x, ret: %x\n", mac, ret)
 
 	DestroyKey(session, keyHandle)
 }
