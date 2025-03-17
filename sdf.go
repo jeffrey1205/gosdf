@@ -8,57 +8,64 @@ package gosdf
 
 #include "sdf.h"
 
-static void *gs_sdf_device = NULL; //加密设备
-static void *gs_lib_handle = NULL; //so库
+#define SW_GM0018_2012 // SW加密卡2012版本接口
+
+static HANDLE gs_sdf_device = NULL; //加密设备
+static HANDLE gs_lib_handle = NULL; //so库
 
 //设备管理
-int (*OpenDevice)(void **);
-int (*CloseDevice)(void *);
-int (*OpenSession)(void *, void **);
-int (*CloseSession)(void *);
+RV (*OpenDevice)(HANDLE*);
+RV (*CloseDevice)(HANDLE);
+RV (*OpenSession)(HANDLE, HANDLE*);
+RV (*CloseSession)(HANDLE);
 
 //杂凑运算
-int (*HashInit)(void *, unsigned int, ECCrefPublicKey *, unsigned char *, unsigned int);
-int (*HashUpdate)(void *, unsigned char *, unsigned int);
-int (*HashFinal)(void *, unsigned char *, unsigned int *);
+RV (*HashInit)(HANDLE, UINT32, ECCrefPublicKey *, unsigned char *, UINT32);
+RV (*HashUpdate)(HANDLE, unsigned char *, UINT32);
+RV (*HashFinal)(HANDLE, unsigned char *, UINT32 *);
+
+//HMAC运算函数:该实现为三未信安提供,跟0018-2023不一致
+RV (*HMACInit)(HANDLE, UINT32, UINT32, UCHAR*, UINT32);
+RV (*HMACUpdate)(HANDLE, UCHAR*, UINT32);
+RV (*HMACFinal)(HANDLE, UCHAR*, UINT32*);
 
 //密钥管理
-int (*ExportSignPublicKeyECC)(void *, unsigned int, ECCrefPublicKey *);
-int (*ExportEncPublicKeyECC)(void *, unsigned int, ECCrefPublicKey *);
-int (*GenerateKeyPairECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *,ECCrefPrivateKey *);
-int (*GenerateKeyWithIPKECC)(void *, unsigned int, unsigned int, ECCCipher *, void **);
-int (*GenerateKeyWithEPKECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *, ECCCipher *, void **);
-int (*ImportKeyWithISKECC)(void *, unsigned int, ECCCipher *, void **);
-int (*GenerateAgreementDataWithECC)(void *, unsigned int, unsigned int, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, void **);
-int (*GenerateKeyWithECC)(void *, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, void *, void **);
-int (*GenerateAgreementDataAndKeyWithECC)(void *, unsigned int, unsigned int, unsigned char *, unsigned int, unsigned char *, unsigned int, ECCrefPublicKey *, ECCrefPublicKey *, ECCrefPublicKey *, ECCrefPublicKey *, void *, void **);
-int (*ExchangeDigitEnvelopeBaseOnECC)(void *, unsigned int, unsigned int, ECCrefPublicKey *, ECCCipher *, ECCCipher *);
-int (*GenerateKeyWithKEK)(void *, unsigned int, unsigned int , unsigned int, unsigned char *, unsigned int *, void **);
-int (*ImportKeyWithKEK)(void *, unsigned int, unsigned int, unsigned char *, unsigned int, void **);
-int (*DestroyKey)(void *, void *);
+RV (*ExportSignPublicKeyECC)(HANDLE, UINT32, ECCrefPublicKey *);
+RV (*ExportEncPublicKeyECC)(HANDLE, UINT32, ECCrefPublicKey *);
+RV (*GenerateKeyPairECC)(HANDLE, UINT32, UINT32, ECCrefPublicKey *,ECCrefPrivateKey *);
+RV (*GenerateKeyWithIPKECC)(HANDLE, UINT32, UINT32, ECCCipher *, HANDLE*);
+RV (*GenerateKeyWithEPKECC)(HANDLE, UINT32, UINT32, ECCrefPublicKey *, ECCCipher *, HANDLE*);
+RV (*ImportKeyWithISKECC)(HANDLE, UINT32, ECCCipher *, HANDLE*);
+RV (*GenerateAgreementDataWithECC)(HANDLE, UINT32, UINT32, unsigned char *, UINT32, ECCrefPublicKey *, ECCrefPublicKey *, HANDLE*);
+RV (*GenerateKeyWithECC)(HANDLE, unsigned char *, UINT32, ECCrefPublicKey *, ECCrefPublicKey *, HANDLE, HANDLE*);
+RV (*GenerateAgreementDataAndKeyWithECC)(HANDLE, UINT32, UINT32, unsigned char *, UINT32, unsigned char *, UINT32, ECCrefPublicKey *, ECCrefPublicKey *, ECCrefPublicKey *, ECCrefPublicKey *, HANDLE, HANDLE*);
+RV (*ExchangeDigitEnvelopeBaseOnECC)(HANDLE, UINT32, UINT32, ECCrefPublicKey *, ECCCipher *, ECCCipher *);
+RV (*GenerateKeyWithKEK)(HANDLE, UINT32, UINT32 , UINT32, unsigned char *, UINT32 *, HANDLE*);
+RV (*ImportKeyWithKEK)(HANDLE, UINT32, UINT32, unsigned char *, UINT32, HANDLE*);
+RV (*DestroyKey)(HANDLE, HANDLE);
 
 //非对称运算
-int (*ExternalVerifyECC)(void *, unsigned int, ECCrefPublicKey *, unsigned char *, unsigned int, ECCSignature *);
-int (*InternalSignECC)(void *, unsigned int, unsigned char *, unsigned int, ECCSignature *);
-int (*InternalVerifyECC)(void *, unsigned int, unsigned char *, unsigned int, ECCSignature *);
-int (*ExternalEncryptECC)(void *, unsigned int, ECCrefPublicKey *,unsigned char *, unsigned int, ECCCipher *);
-int (*ExternalDecryptECC)(void *, unsigned int, ECCrefPrivateKey *, ECCCipher *, unsigned char *, unsigned int *);
-int (*InternalEncryptECC)(void *, unsigned int, unsigned char *, unsigned int, ECCCipher *);
-int (*InternalDecryptECC)(void *, unsigned int, ECCCipher *, unsigned char *, unsigned int *);
+RV (*ExternalVerifyECC)(HANDLE, UINT32, ECCrefPublicKey *, unsigned char *, UINT32, ECCSignature *);
+RV (*InternalSignECC)(HANDLE, UINT32, unsigned char *, UINT32, ECCSignature *);
+RV (*InternalVerifyECC)(HANDLE, UINT32, unsigned char *, UINT32, ECCSignature *);
+RV (*ExternalEncryptECC)(HANDLE, UINT32, ECCrefPublicKey *,unsigned char *, UINT32, ECCCipher *);
+RV (*ExternalDecryptECC)(HANDLE, UINT32, ECCrefPrivateKey *, ECCCipher *, unsigned char *, UINT32 *);
+RV (*InternalEncryptECC)(HANDLE, UINT32, unsigned char *, UINT32, ECCCipher *);
+RV (*InternalDecryptECC)(HANDLE, UINT32, ECCCipher *, unsigned char *, UINT32 *);
 
 //对称运算
-int (*Encrypt)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
-int (*Decrypt)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
-int (*CalculateMAC)(void *, void *, unsigned int, unsigned char *, unsigned char *, unsigned int, unsigned char *, unsigned int *);
+RV (*Encrypt)(HANDLE, HANDLE, UINT32, unsigned char *, unsigned char *, UINT32, unsigned char *, UINT32 *);
+RV (*Decrypt)(HANDLE, HANDLE, UINT32, unsigned char *, unsigned char *, UINT32, unsigned char *, UINT32 *);
+RV (*CalculateMAC)(HANDLE, HANDLE, UINT32, unsigned char *, unsigned char *, UINT32, unsigned char *, UINT32 *);
 
 //文件管理
-int (*CreateFile)(void *, unsigned char *, unsigned int, unsigned int);
-int (*ReadFile)(void *, unsigned char *, unsigned int, unsigned int, unsigned int *, unsigned char *);
-int (*WriteFile)(void *, unsigned char *, unsigned int, unsigned int, unsigned int, unsigned char *);
-int (*DeleteFile)(void *, unsigned char *, unsigned int);
+RV (*CreateFile)(HANDLE, unsigned char *, UINT32, UINT32);
+RV (*ReadFile)(HANDLE, unsigned char *, UINT32, UINT32, UINT32 *, unsigned char *);
+RV (*WriteFile)(HANDLE, unsigned char *, UINT32, UINT32, UINT32, unsigned char *);
+RV (*DeleteFile)(HANDLE, unsigned char *, UINT32);
 
 // 随机数
-int (*GenerateRandom)(void *, unsigned int, unsigned char *);
+RV (*GenerateRandom)(HANDLE, UINT32, unsigned char *);
 
 struct func_name_pair
 {
@@ -79,6 +86,12 @@ int plugin_init(char *path)
 		{"SDF_HashInit", (long **)&HashInit},
 		{"SDF_HashUpdate", (long **)&HashUpdate},
 		{"SDF_HashFinal", (long **)&HashFinal},
+
+#ifdef SW_GM0018_2012
+		{"SDF_HMAC_Init", (long **)&HMACInit},
+		{"SDF_HMAC_Update", (long **)&HMACUpdate},
+		{"SDF_HMAC_Final", (long **)&HMACFinal},
+#endif
 
 		{"SDF_ExportSignPublicKey_ECC", (long **)&ExportSignPublicKeyECC},
 		{"SDF_ExportEncPublicKey_ECC", (long **)&ExportEncPublicKeyECC},
@@ -159,98 +172,113 @@ void plugin_exit(void)
 		dlclose(gs_lib_handle);
 }
 
-long open_session(int *ret)
+long open_session(RV *ret)
 {
-	void *session = NULL;
+	HANDLE session = NULL;
 
 	*ret = OpenSession(gs_sdf_device, &session);
 	return (long)session;
 }
 
-int close_session(long session)
+RV close_session(long session)
 {
-	return CloseSession((void *)session);
+	return CloseSession((HANDLE)session);
 }
 
-int hash_init(long session, unsigned int alg, ECCrefPublicKey *pub, BYTE *id, u32 id_len)
+RV hash_init(long session, UINT32 alg, ECCrefPublicKey *pub, BYTE *id, UINT32 id_len)
 {
-	return HashInit((void *)session, alg, pub, id, id_len);
+	return HashInit((HANDLE)session, alg, pub, id, id_len);
 }
 
-int hash_update(long session, unsigned char *buf, unsigned int buf_len)
+RV hash_update(long session, unsigned char *buf, UINT32 buf_len)
 {
-	return HashUpdate((void *)session, buf, buf_len);
+	return HashUpdate((HANDLE)session, buf, buf_len);
 }
 
-int hash_final(long session, unsigned char *hash, unsigned int *hash_len)
+RV hash_final(long session, unsigned char *hash, UINT32 *hash_len)
 {
-	return HashFinal((void *)session, hash, hash_len);
+	return HashFinal((HANDLE)session, hash, hash_len);
 }
 
-int external_verify_ecc(long session, unsigned int alg, ECCrefPublicKey *key, unsigned char *buf, unsigned int buf_len, ECCSignature *sig)
+RV hmac_init(long session, UINT32 alg, UINT32 kek, UCHAR* pucKey, UINT32 key_len)
 {
-	return ExternalVerifyECC((void *)session, alg, key, buf, buf_len, sig);
+	return HMACInit((HANDLE)session, alg, kek, pucKey, key_len);
 }
 
-long gen_key_with_kek(long session, u32 key_bits, u32 alg_id, u32 kek_index, BYTE *key_buf, u32 *key_len, int *ret)
+RV hmac_update(long session, UCHAR* data, UINT32 data_len)
 {
-	void *key_handle = NULL;
+	return HMACUpdate((HANDLE)session, data, data_len);
+}
+
+RV hmac_final(long session, UCHAR* mac, UINT32* mac_len)
+{
+	return HMACFinal((HANDLE)session, mac, mac_len);
+}
+
+RV external_verify_ecc(long session, UINT32 alg, ECCrefPublicKey *key, unsigned char *buf, UINT32 buf_len, ECCSignature *sig)
+{
+	return ExternalVerifyECC((HANDLE)session, alg, key, buf, buf_len, sig);
+}
+
+long gen_key_with_kek(long session, UINT32 key_bits, UINT32 alg_id, UINT32 kek_index, BYTE *key_buf, UINT32 *key_len, RV *ret)
+{
+	HANDLE key_handle = NULL;
 
 	*ret = GenerateKeyWithKEK((HANDLE)session, key_bits, alg_id, kek_index, key_buf, key_len, &key_handle);
 	return (long)key_handle;
 }
 
-int import_key_with_kek(long session, u32 alg_id, u32 kek_index, BYTE *key_buf, u32 key_len, int *ret)
+RV import_key_with_kek(long session, UINT32 alg_id, UINT32 kek_index, BYTE *key_buf, UINT32 key_len, RV *ret)
 {
-	void *key_handle = NULL;
+	HANDLE key_handle = NULL;
 
 	*ret = ImportKeyWithKEK((HANDLE)session, alg_id, kek_index, key_buf, key_len, &key_handle);
 	return (long)key_handle;
 }
 
-int destroy_key(long session, long key)
+RV destroy_key(long session, long key)
 {
 	return DestroyKey((HANDLE)session, (HANDLE)key);
 }
 
-int encrypt(long session, long key, u32 alg, BYTE *iv, BYTE *data, u32 data_len, BYTE *out_buf, u32 *out_len)
+RV encrypt(long session, long key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
 {
 	return Encrypt((HANDLE)session, (HANDLE)key, alg, iv, data, data_len, out_buf, out_len);
 }
 
-int decrypt(long session, long key, u32 alg, BYTE *iv, BYTE *data, u32 data_len, BYTE *out_buf, u32 *out_len)
+RV decrypt(long session, long key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
 {
 	return Decrypt((HANDLE)session, (HANDLE)key, alg, iv, data, data_len, out_buf, out_len);
 }
 
-int cbc_mac(long session, long key, u32 alg, BYTE *iv, BYTE *data, u32 data_len, BYTE *out_buf, u32 *out_len)
+RV cbc_mac(long session, long key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
 {
 	return CalculateMAC((HANDLE)session, (HANDLE)key, alg, iv, data, data_len, out_buf, out_len);
 }
 
-int create_file(long session, unsigned char *name, unsigned int name_len, unsigned int size)
+RV create_file(long session, unsigned char *name, UINT32 name_len, UINT32 size)
 {
-	return CreateFile((void *)session, name, name_len, size);
+	return CreateFile((HANDLE)session, name, name_len, size);
 }
 
-int read_file(long session, unsigned char *name, unsigned int name_len, unsigned int offset, unsigned int *file_len, unsigned char *buf)
+RV read_file(long session, unsigned char *name, UINT32 name_len, UINT32 offset, UINT32 *file_len, unsigned char *buf)
 {
-	return ReadFile((void *)session, name, name_len, offset, file_len, buf);
+	return ReadFile((HANDLE)session, name, name_len, offset, file_len, buf);
 }
 
-int write_file(long session, unsigned char *name, unsigned int name_len, unsigned int offset, unsigned int file_len, unsigned char *buf)
+RV write_file(long session, unsigned char *name, UINT32 name_len, UINT32 offset, UINT32 file_len, unsigned char *buf)
 {
-	return WriteFile((void *)session, name, name_len, offset, file_len, buf);
+	return WriteFile((HANDLE)session, name, name_len, offset, file_len, buf);
 }
 
-int delete_file(long session, unsigned char *name, unsigned int name_len)
+RV delete_file(long session, unsigned char *name, UINT32 name_len)
 {
-	return DeleteFile((void *)session, name, name_len);
+	return DeleteFile((HANDLE)session, name, name_len);
 }
 
-int gen_random(long session, unsigned int len, unsigned char *buf)
+RV gen_random(long session, UINT32 len, unsigned char *buf)
 {
-	return GenerateRandom((void *)session, len, buf);
+	return GenerateRandom((HANDLE)session, len, buf);
 }
 */
 import "C"
@@ -274,83 +302,107 @@ func Exit() {
 }
 
 // OpenSession:打开会话,成功返回session_id >0,失败返回0和错误码
-func OpenSession() (int, SDR) {
-	var ret C.int
-	session := C.open_session((*C.int)(unsafe.Pointer(&ret)))
-	return int(session), SDR(ret)
+func OpenSession() (int, RV) {
+	var ret C.unsigned
+	session := C.open_session((*C.unsigned)(unsafe.Pointer(&ret)))
+	return int(session), RV(ret)
 }
 
 // CloseSession:关闭会话
-func CloseSession(session int) SDR {
-	return SDR(C.close_session(C.long(session)))
+func CloseSession(session int) RV {
+	return RV(C.close_session(C.long(session)))
 }
 
 // Sm3Init:sm3 init，传入打开的会话
-func Sm3Init(session int) SDR {
-	return SDR(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3), nil, nil, 0))
+func Sm3Init(session int) RV {
+	return RV(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3), nil, nil, 0))
 }
 
 // Sm3InitWithPubKey:sm3 init，传入打开的会话,公钥进行预处理，用于签名验签
-func Sm3InitWithPubKey(session int, pubKey ECCrefPublicKey, id []byte) SDR {
-	return SDR(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3),
+func Sm3InitWithPubKey(session int, pubKey ECCrefPublicKey, id []byte) RV {
+	return RV(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3),
 		(*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
 		(*C.uchar)(unsafe.Pointer(&id[0])), C.unsigned(len(id))))
 }
 
 // Sm3Update:sm3 update
-func Sm3Update(session int, buf []byte) SDR {
-	return SDR(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
+func Sm3Update(session int, buf []byte) RV {
+	return RV(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
 		C.unsigned(len(buf))))
 }
 
 // SdfSm3Update:sm3 final，返回32字节的hash数组
-func Sm3Final(session int) ([]byte, SDR) {
-	var len C.unsigned = 32
+func Sm3Final(session int) ([]byte, RV) {
+	var len C.unsigned = 32 // sm3 hash长度固定32字节
 	hash := make([]byte, 32)
 
 	ret := C.hash_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])),
 		(*C.unsigned)(unsafe.Pointer(&len)))
 
-	return hash, SDR(ret)
+	return hash, RV(ret)
+}
+
+// Sm3HMACInit:hmac-sm3,此处暂时匹配sw卡,跟2023标准暂不一致
+func Sm3HMACInit(session int, kekIndex uint32, key []byte) RV {
+	return RV(C.hmac_init(C.long(session), C.unsigned(C.SGD_SM3),
+		C.unsigned(kekIndex),
+		(*C.uchar)(unsafe.Pointer(&key[0])), C.unsigned(len(key))))
+}
+
+// Sm3HMACUpdate:hmac-sm3 update
+func Sm3HMACUpdate(session int, data []byte) RV {
+	return RV(C.hmac_update(C.long(session),
+		(*C.uchar)(unsafe.Pointer(&data[0])), C.unsigned(len(data))))
+}
+
+// Sm3HMACFinal:hmac-sm3 final,返回32字节的hash数组
+func Sm3HMACFinal(session int) ([]byte, RV) {
+	var len C.unsigned = 32 // sm3 hash长度固定32字节
+	hash := make([]byte, 32)
+
+	ret := C.hmac_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])),
+		(*C.unsigned)(unsafe.Pointer(&len)))
+
+	return hash, RV(ret)
 }
 
 // GenerateKeyWithKEK: 生成会话密钥并导出,密钥会用PKCS7填充
-func GenerateKeyWithKEK(session int, kekIndex uint32, keyBits uint32) ([]byte, int, SDR) {
+func GenerateKeyWithKEK(session int, kekIndex uint32, keyBits uint32) ([]byte, int, RV) {
 	buf := make([]byte, 256)
 	var keyLen C.unsigned
-	var ret C.int
+	var ret C.unsigned
 
 	handle := C.gen_key_with_kek(C.long(session), C.unsigned(keyBits),
 		C.unsigned(C.SGD_SMS4_ECB), C.unsigned(kekIndex),
 		(*C.uchar)(unsafe.Pointer(&buf[0])), (*C.unsigned)(unsafe.Pointer(&keyLen)),
-		(*C.int)(unsafe.Pointer(&ret)))
+		(*C.unsigned)(unsafe.Pointer(&ret)))
 	if ret != 0 {
-		return nil, 0, SDR(ret)
+		return nil, 0, RV(ret)
 	}
 
 	keyBuf := make([]byte, keyLen)
 	copy(keyBuf, buf[:keyLen])
-	return keyBuf, int(handle), SDR(ret)
+	return keyBuf, int(handle), RV(ret)
 }
 
 // ImportKeyWithKEK: 导入并解密会话密钥
-func ImportKeyWithKEK(session int, kekIndex uint32, key []byte) (int, SDR) {
-	var ret C.int
+func ImportKeyWithKEK(session int, kekIndex uint32, key []byte) (int, RV) {
+	var ret C.unsigned
 
 	handle := C.import_key_with_kek(C.long(session), C.unsigned(C.SGD_SMS4_ECB),
 		C.unsigned(kekIndex), (*C.uchar)(unsafe.Pointer(&key[0])),
-		C.unsigned(len(key)), (*C.int)(unsafe.Pointer(&ret)))
+		C.unsigned(len(key)), (*C.unsigned)(unsafe.Pointer(&ret)))
 
-	return int(handle), SDR(ret)
+	return int(handle), RV(ret)
 }
 
 // DestroyKey:销毁会话密钥,释放密钥句柄
-func DestroyKey(session, keyHandle int) SDR {
-	return SDR(C.destroy_key(C.long(session), C.long(keyHandle)))
+func DestroyKey(session, keyHandle int) RV {
+	return RV(C.destroy_key(C.long(session), C.long(keyHandle)))
 }
 
 // SM4EncryptECB:sm4加密，ECB模式，调用者须填充
-func SM4EncryptECB(session, key int, data []byte) ([]byte, SDR) {
+func SM4EncryptECB(session, key int, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	iv := make([]byte, 16)
 	var outLen C.unsigned = 0
@@ -359,11 +411,11 @@ func SM4EncryptECB(session, key int, data []byte) ([]byte, SDR) {
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
-	return outBuf, SDR(ret)
+	return outBuf, RV(ret)
 }
 
 // SM4EncryptCBC:sm4加密，CBC模式，调用者须填充
-func SM4EncryptCBC(session, key int, iv, data []byte) ([]byte, SDR) {
+func SM4EncryptCBC(session, key int, iv, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	var outLen C.unsigned = 0
 
@@ -371,11 +423,11 @@ func SM4EncryptCBC(session, key int, iv, data []byte) ([]byte, SDR) {
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
-	return outBuf, SDR(ret)
+	return outBuf, RV(ret)
 }
 
 // SM4DecryptECB:sm4解密，ECB模式
-func SM4DecryptECB(session, key int, data []byte) ([]byte, SDR) {
+func SM4DecryptECB(session, key int, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	iv := make([]byte, 16)
 	var outLen C.unsigned = 0
@@ -384,11 +436,11 @@ func SM4DecryptECB(session, key int, data []byte) ([]byte, SDR) {
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
-	return outBuf, SDR(ret)
+	return outBuf, RV(ret)
 }
 
 // SM4DecryptCBC:sm4解密，CBC模式
-func SM4DecryptCBC(session, key int, iv, data []byte) ([]byte, SDR) {
+func SM4DecryptCBC(session, key int, iv, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	var outLen C.unsigned = 0
 
@@ -396,38 +448,38 @@ func SM4DecryptCBC(session, key int, iv, data []byte) ([]byte, SDR) {
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
-	return outBuf, SDR(ret)
+	return outBuf, RV(ret)
 }
 
-// 计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
-func SM4CalculateCBCMAC(session, key int, iv []byte, data []byte) ([]byte, SDR) {
+// SM4CalculateCBCMAC:计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制.该函数不填充
+func SM4CalculateCBCMAC(session, key int, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, 16) // SM4 CBC-MAC固定16字节
 	var outLen C.unsigned = 0
 
-	ret := C.cbc_mac(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_CBC),
+	ret := C.cbc_mac(C.long(session), C.long(key), C.unsigned(C.SGD_SMS4_MAC),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
 
-	return outBuf, SDR(ret)
+	return outBuf, RV(ret)
 }
 
 // Sm2ExtKeyVerify:sm2外部key验签
-func Sm2ExtKeyVerify(session int, pubKey ECCrefPublicKey, buf []byte, sig ECCSignature) SDR {
-	return SDR(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1),
+func Sm2ExtKeyVerify(session int, pubKey ECCrefPublicKey, buf []byte, sig ECCSignature) RV {
+	return RV(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1),
 		(*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])),
 		C.unsigned(len(buf)), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }
 
 // CreateFile:卡中创建文件
-func CreateFile(session int, fileName string, fileSize uint32) SDR {
+func CreateFile(session int, fileName string, fileSize uint32) RV {
 	buf := make([]byte, len(fileName))
-	return SDR(C.create_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
+	return RV(C.create_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
 		C.unsigned(len(fileName)), C.unsigned(fileSize)))
 }
 
 // ReadFile:读取卡中文件,从offset开始读取readLen字节
-func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, SDR) {
+func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, RV) {
 	fileBytes := make([]byte, len(fileName))
 	buf := make([]byte, readLen) //读取文件buf
 
@@ -436,26 +488,26 @@ func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, SDR
 		(*C.unsigned)(unsafe.Pointer(&readLen)),
 		(*C.uchar)(unsafe.Pointer(&buf[0])))
 
-	return buf, SDR(ret)
+	return buf, RV(ret)
 }
 
 // WriteFile:文件写入内容,从offset开始写入readLen字节
-func WriteFile(session int, fileName string, offSet uint32, buf []byte) SDR {
+func WriteFile(session int, fileName string, offSet uint32, buf []byte) RV {
 	fileBytes := make([]byte, len(fileName))
-	return SDR(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])),
+	return RV(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])),
 		C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(len(buf)),
 		(*C.uchar)(unsafe.Pointer(&buf[0]))))
 }
 
 // DeleteFile:删除卡中文件
-func DeleteFile(session int, fileName string) SDR {
+func DeleteFile(session int, fileName string) RV {
 	buf := make([]byte, len(fileName))
-	return SDR(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
+	return RV(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
 		C.unsigned(len(fileName))))
 }
 
 // GenerateRandom:生成随机数
-func GenerateRandom(len int) ([]byte, SDR) {
+func GenerateRandom(len int) ([]byte, RV) {
 	session, ret := OpenSession()
 	if ret != 0 {
 		return nil, ret
@@ -463,6 +515,6 @@ func GenerateRandom(len int) ([]byte, SDR) {
 	defer CloseSession(session)
 
 	buf := make([]byte, len)
-	ret = SDR(C.gen_random(C.long(session), C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
+	ret = RV(C.gen_random(C.long(session), C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
 	return buf, ret
 }

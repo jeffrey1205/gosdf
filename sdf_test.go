@@ -37,6 +37,34 @@ func TestSm3(t *testing.T) {
 	fmt.Printf("SM3 Final ret %x, hash: %x\n", ret, hash)
 }
 
+func TestSm3HMAC(t *testing.T) {
+	if err := Init(enginePath); err != nil {
+		fmt.Println("SDF Init error:", err)
+		return
+	}
+	defer Exit()
+
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		fmt.Printf("SDF Open Session error: %x\n", ret)
+		return
+	}
+	defer CloseSession(session)
+
+	keyByte, _ := hex.DecodeString("d9d858ba5784328e95c420c35c4873442ed6392531e1c149d2ff5696b2352018")
+	if ret := Sm3HMACInit(session, 1, keyByte); ret != SDR_OK {
+		fmt.Printf("HMAC Init error: %x\n", ret)
+		return
+	}
+
+	if ret := Sm3HMACUpdate(session, []byte("test")); ret != SDR_OK {
+		fmt.Printf("HMAC Update error: %x\n", ret)
+	}
+
+	hash, ret := Sm3HMACFinal(session)
+	fmt.Printf("HMAC Final ret %x, hash: %x\n", ret, hash)
+}
+
 func TestSm4Enc(t *testing.T) {
 	if err := Init(enginePath); err != nil {
 		fmt.Println("SDF Init error:", err)
@@ -137,7 +165,7 @@ func TestSm4MAC(t *testing.T) {
 	iv := make([]byte, 16)                                  // IV设置为0
 	plainText := []byte("test1111test1111test1111test1111") // 加密两个分组
 	cipherText, ret := SM4EncryptCBC(session, keyHandle, iv, plainText)
-	fmt.Printf("cbc cipher: %x, ret: %x\n", cipherText, ret)
+	fmt.Printf("cbc cipher mac:%x, ret: %x\n", cipherText[16:], ret)
 
 	// 一次计算两个分组的MAC
 	iv = make([]byte, 16) // IV设置为0
