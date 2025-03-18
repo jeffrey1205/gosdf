@@ -181,3 +181,13 @@ func TestSm4MAC(t *testing.T) {
 
 	DestroyKey(session, keyHandle)
 }
+
+func TestISO9797M3Padding(t *testing.T) {
+	data1, _ := hex.DecodeString("00112233445566778899")
+	padded, _ := ISO9797M3Padding(data1, 16)
+	fmt.Printf("data1 padded: %x\n", padded)
+
+	data2, _ := hex.DecodeString("00112233445566778899AABBCCDDEEFF")
+	padded, _ = ISO9797M3Padding(data2, 16)
+	fmt.Printf("data2 padded: %x\n", padded)
+}
