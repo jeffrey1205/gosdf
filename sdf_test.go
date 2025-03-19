@@ -3,7 +3,7 @@ package gosdf
 import (
 	"encoding/hex"
 	"fmt"
-	"runtime"
+	"sync"
 	"testing"
 )
 
@@ -78,9 +78,6 @@ func TestSm4Enc(t *testing.T) {
 		return
 	}
 
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
 	key, keyHandle, ret := GenerateKeyWithKEK(session, 1, 128)
 	if ret != SDR_OK {
 		fmt.Printf("SDF GenerateKeyWithKEK error: %x\n", ret)
@@ -110,9 +107,6 @@ func TestSm4Dec(t *testing.T) {
 		fmt.Printf("SDF Open Session error: %x\n", ret)
 		return
 	}
-
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 
 	keyByte, _ := hex.DecodeString("d9d858ba5784328e95c420c35c4873442ed6392531e1c149d2ff5696b2352018")
 	keyHandle, ret := ImportKeyWithKEK(session, 1, keyByte)
@@ -147,9 +141,6 @@ func TestSm4MAC(t *testing.T) {
 		fmt.Printf("SDF Open Session error: %x\n", ret)
 		return
 	}
-
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 
 	keyByte, _ := hex.DecodeString("d9d858ba5784328e95c420c35c4873442ed6392531e1c149d2ff5696b2352018")
 	keyHandle, ret := ImportKeyWithKEK(session, 1, keyByte)
@@ -190,4 +181,81 @@ func TestISO9797M3Padding(t *testing.T) {
 	data2, _ := hex.DecodeString("00112233445566778899AABBCCDDEEFF")
 	padded, _ = ISO9797M3Padding(data2, 16)
 	fmt.Printf("data2 padded: %x\n", padded)
+}
+
+func TestSm4MultiThread(t *testing.T) {
+	if err := Init(enginePath); err != nil {
+		fmt.Println("SDF Init error:", err)
+		return
+	}
+	defer Exit()
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		session, ret := OpenSession()
+		if ret != SDR_OK {
+			fmt.Printf("SDF Open Session error: %x\n", ret)
+			return
+		}
+
+		fmt.Printf("[1]session: %x\n", session)
+
+		keyByte, _ := hex.DecodeString("d9d858ba5784328e95c420c35c4873442ed6392531e1c149d2ff5696b2352018")
+		keyHandle, ret := ImportKeyWithKEK(session, 1, keyByte)
+		if ret != SDR_OK {
+			fmt.Printf("SDF ImportKeyWithKEK error: %x\n", ret)
+			CloseSession(session)
+			return
+		}
+
+		fmt.Printf("[1]key: %x\n", keyHandle)
+
+		// 加密两个分组,IV设置为0,最后一个密文分组即为MAC
+		iv := make([]byte, 16)                                  // IV设置为0
+		plainText := []byte("test1111test1111test1111test1111") // 加密两个分组
+		cipherText, ret := SM4EncryptCBC(session, keyHandle, iv, plainText)
+		fmt.Printf("[1]cbc cipher mac:%x, ret: %x\n", cipherText[16:], ret)
+
+		// 一次计算两个分组的MAC
+		iv = make([]byte, 16) // IV设置为0
+		mac, ret := SM4CalculateCBCMAC(session, keyHandle, iv, plainText)
+		fmt.Printf("[1]cbc mac: %x, ret: %x\n", mac, ret)
+
+		DestroyKey(session, keyHandle)
+	}()
+
+	go func() {
+		defer wg.Done()
+		session, ret := OpenSession()
+		if ret != SDR_OK {
+			fmt.Printf("SDF Open Session error: %x\n", ret)
+			return
+		}
+
+		fmt.Printf("[2]session: %x\n", session)
+
+		keyByte, _ := hex.DecodeString("d9d858ba5784328e95c420c35c4873442ed6392531e1c149d2ff5696b2352018")
+		keyHandle, ret := ImportKeyWithKEK(session, 1, keyByte)
+		if ret != SDR_OK {
+			fmt.Printf("SDF ImportKeyWithKEK error: %x\n", ret)
+			CloseSession(session)
+			return
+		}
+
+		fmt.Printf("[2]key: %x\n", keyHandle)
+		// 分两步计算两个分组的MAC
+		iv := make([]byte, 16)                                  // IV设置为0
+		plainText := []byte("test1111test1111test1111test1111") // 加密两个分组
+		mac, ret := SM4CalculateCBCMAC(session, keyHandle, iv, plainText[:16])
+		fmt.Printf("[2]cbc mac 1: %x, ret: %x\n", mac, ret)
+		mac, ret = SM4CalculateCBCMAC(session, keyHandle, mac, plainText[16:])
+		fmt.Printf("[2]cbc mac 2: %x, ret: %x\n", mac, ret)
+
+		DestroyKey(session, keyHandle)
+	}()
+
+	wg.Wait()
 }

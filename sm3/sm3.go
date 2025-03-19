@@ -5,26 +5,26 @@ import (
 	"hash"
 	"runtime"
 
-	"gitee.com/zhujingfeng/gosdf"
+	sdf "gitee.com/zhujingfeng/gosdf"
 )
 
 type SM3 struct {
-	session int
+	session sdf.HANDLE
 }
 
 // 关闭session
 func (sm3 *SM3) Close() {
-	gosdf.CloseSession(sm3.session)
+	sdf.CloseSession(sm3.session)
 }
 
 // 创建哈希计算实例
 func New() hash.Hash {
-	session, ret := gosdf.OpenSession()
-	if ret != gosdf.SDR_OK {
+	session, ret := sdf.OpenSession()
+	if ret != sdf.SDR_OK {
 		panic("open session error: " + fmt.Sprint(ret))
 	}
 
-	if ret := gosdf.Sm3Init(session); ret != gosdf.SDR_OK {
+	if ret := sdf.Sm3Init(session); ret != sdf.SDR_OK {
 		panic(fmt.Sprintf("session %d init error: %d", session, ret))
 	}
 
@@ -47,7 +47,7 @@ func (sm3 *SM3) Reset() {
 }
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
-	if ret := gosdf.Sm3Update(sm3.session, p); ret != gosdf.SDR_OK {
+	if ret := sdf.Sm3Update(sm3.session, p); ret != sdf.SDR_OK {
 		return 0, fmt.Errorf("sm3 update error: %d", ret)
 	}
 
@@ -55,8 +55,12 @@ func (sm3 *SM3) Write(p []byte) (int, error) {
 }
 
 func (sm3 *SM3) Sum(in []byte) []byte {
-	hash, ret := gosdf.Sm3Final(sm3.session)
-	if ret != gosdf.SDR_OK {
+	if len(in) > 0 {
+		_, _ = sm3.Write(in)
+	}
+
+	hash, ret := sdf.Sm3Final(sm3.session)
+	if ret != sdf.SDR_OK {
 		panic(fmt.Sprintf("session %d final error: %d", sm3.session, ret))
 	}
 

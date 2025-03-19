@@ -2,6 +2,7 @@ package gosdf
 
 // 错误码定义
 type RV uint32
+type HANDLE *int
 
 const (
 	SDR_OK               RV = 0x0                   // 操作成功

@@ -172,111 +172,102 @@ void plugin_exit(void)
 		dlclose(gs_lib_handle);
 }
 
-long open_session(RV *ret)
+RV open_session(long **session)
 {
-	HANDLE session = NULL;
-
-	*ret = OpenSession(gs_sdf_device, &session);
-	return (long)session;
+	return OpenSession(gs_sdf_device, (HANDLE *)session);
 }
 
-RV close_session(long session)
+RV close_session(long *session)
 {
-	return CloseSession((HANDLE)session);
+	return CloseSession(session);
 }
 
-RV hash_init(long session, UINT32 alg, ECCrefPublicKey *pub, BYTE *id, UINT32 id_len)
+RV hash_init(long *session, UINT32 alg, ECCrefPublicKey *pub, BYTE *id, UINT32 id_len)
 {
 	return HashInit((HANDLE)session, alg, pub, id, id_len);
 }
 
-RV hash_update(long session, unsigned char *buf, UINT32 buf_len)
+RV hash_update(long *session, unsigned char *buf, UINT32 buf_len)
 {
 	return HashUpdate((HANDLE)session, buf, buf_len);
 }
 
-RV hash_final(long session, unsigned char *hash, UINT32 *hash_len)
+RV hash_final(long *session, unsigned char *hash, UINT32 *hash_len)
 {
 	return HashFinal((HANDLE)session, hash, hash_len);
 }
 
-RV hmac_init(long session, UINT32 alg, UINT32 kek, UCHAR* pucKey, UINT32 key_len)
+RV hmac_init(long *session, UINT32 alg, UINT32 kek, UCHAR* pucKey, UINT32 key_len)
 {
 	return HMACInit((HANDLE)session, alg, kek, pucKey, key_len);
 }
 
-RV hmac_update(long session, UCHAR* data, UINT32 data_len)
+RV hmac_update(long *session, UCHAR* data, UINT32 data_len)
 {
 	return HMACUpdate((HANDLE)session, data, data_len);
 }
 
-RV hmac_final(long session, UCHAR* mac, UINT32* mac_len)
+RV hmac_final(long *session, UCHAR* mac, UINT32* mac_len)
 {
 	return HMACFinal((HANDLE)session, mac, mac_len);
 }
 
-RV external_verify_ecc(long session, UINT32 alg, ECCrefPublicKey *key, unsigned char *buf, UINT32 buf_len, ECCSignature *sig)
+RV external_verify_ecc(long *session, UINT32 alg, ECCrefPublicKey *key, unsigned char *buf, UINT32 buf_len, ECCSignature *sig)
 {
 	return ExternalVerifyECC((HANDLE)session, alg, key, buf, buf_len, sig);
 }
 
-long gen_key_with_kek(long session, UINT32 key_bits, UINT32 alg_id, UINT32 kek_index, BYTE *key_buf, UINT32 *key_len, RV *ret)
+long gen_key_with_kek(long *session, UINT32 key_bits, UINT32 alg_id, UINT32 kek_index, BYTE *key_buf, UINT32 *key_len, long **key_handle)
 {
-	HANDLE key_handle = NULL;
-
-	*ret = GenerateKeyWithKEK((HANDLE)session, key_bits, alg_id, kek_index, key_buf, key_len, &key_handle);
-	return (long)key_handle;
+	return GenerateKeyWithKEK((HANDLE)session, key_bits, alg_id, kek_index, key_buf, key_len, (HANDLE *)key_handle);
 }
 
-RV import_key_with_kek(long session, UINT32 alg_id, UINT32 kek_index, BYTE *key_buf, UINT32 key_len, RV *ret)
+RV import_key_with_kek(long *session, UINT32 alg_id, UINT32 kek_index, BYTE *key_buf, UINT32 key_len, long **key_handle)
 {
-	HANDLE key_handle = NULL;
-
-	*ret = ImportKeyWithKEK((HANDLE)session, alg_id, kek_index, key_buf, key_len, &key_handle);
-	return (long)key_handle;
+	return ImportKeyWithKEK((HANDLE)session, alg_id, kek_index, key_buf, key_len, (HANDLE *)key_handle);
 }
 
-RV destroy_key(long session, long key)
+RV destroy_key(long *session, long *key)
 {
 	return DestroyKey((HANDLE)session, (HANDLE)key);
 }
 
-RV encrypt(long session, long key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
+RV encrypt(long *session, long *key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
 {
 	return Encrypt((HANDLE)session, (HANDLE)key, alg, iv, data, data_len, out_buf, out_len);
 }
 
-RV decrypt(long session, long key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
+RV decrypt(long *session, long *key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
 {
 	return Decrypt((HANDLE)session, (HANDLE)key, alg, iv, data, data_len, out_buf, out_len);
 }
 
-RV cbc_mac(long session, long key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
+RV cbc_mac(long *session, long *key, UINT32 alg, BYTE *iv, BYTE *data, UINT32 data_len, BYTE *out_buf, UINT32 *out_len)
 {
 	return CalculateMAC((HANDLE)session, (HANDLE)key, alg, iv, data, data_len, out_buf, out_len);
 }
 
-RV create_file(long session, unsigned char *name, UINT32 name_len, UINT32 size)
+RV create_file(long *session, unsigned char *name, UINT32 name_len, UINT32 size)
 {
 	return CreateFile((HANDLE)session, name, name_len, size);
 }
 
-RV read_file(long session, unsigned char *name, UINT32 name_len, UINT32 offset, UINT32 *file_len, unsigned char *buf)
+RV read_file(long *session, unsigned char *name, UINT32 name_len, UINT32 offset, UINT32 *file_len, unsigned char *buf)
 {
 	return ReadFile((HANDLE)session, name, name_len, offset, file_len, buf);
 }
 
-RV write_file(long session, unsigned char *name, UINT32 name_len, UINT32 offset, UINT32 file_len, unsigned char *buf)
+RV write_file(long *session, unsigned char *name, UINT32 name_len, UINT32 offset, UINT32 file_len, unsigned char *buf)
 {
 	return WriteFile((HANDLE)session, name, name_len, offset, file_len, buf);
 }
 
-RV delete_file(long session, unsigned char *name, UINT32 name_len)
+RV delete_file(long *session, unsigned char *name, UINT32 name_len)
 {
 	return DeleteFile((HANDLE)session, name, name_len);
 }
 
-RV gen_random(long session, UINT32 len, unsigned char *buf)
+RV gen_random(long *session, UINT32 len, unsigned char *buf)
 {
 	return GenerateRandom((HANDLE)session, len, buf);
 }
@@ -305,112 +296,118 @@ func Exit() {
 }
 
 // OpenSession:打开会话,成功返回session_id >0,失败返回0和错误码
-func OpenSession() (int, RV) {
-	var ret C.unsigned
-	session := C.open_session((*C.unsigned)(unsafe.Pointer(&ret)))
-	return int(session), RV(ret)
+func OpenSession() (HANDLE, RV) {
+	var session HANDLE
+	ret := C.open_session((**C.long)(unsafe.Pointer(&session)))
+	return HANDLE(session), RV(ret)
 }
 
 // CloseSession:关闭会话
-func CloseSession(session int) RV {
-	return RV(C.close_session(C.long(session)))
+func CloseSession(session HANDLE) RV {
+	return RV(C.close_session((*C.long)(unsafe.Pointer(session))))
 }
 
 // Sm3Init:sm3 init，传入打开的会话
-func Sm3Init(session int) RV {
-	return RV(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3), nil, nil, 0))
+func Sm3Init(session HANDLE) RV {
+	return RV(C.hash_init((*C.long)(unsafe.Pointer(session)),
+		C.unsigned(C.SGD_SM3), nil, nil, 0))
 }
 
 // Sm3InitWithPubKey:sm3 init，传入打开的会话,公钥进行预处理，用于签名验签
-func Sm3InitWithPubKey(session int, pubKey ECCrefPublicKey, id []byte) RV {
-	return RV(C.hash_init(C.long(session), C.unsigned(C.SGD_SM3),
-		(*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
+func Sm3InitWithPubKey(session HANDLE, pubKey ECCrefPublicKey, id []byte) RV {
+	return RV(C.hash_init((*C.long)(unsafe.Pointer(session)),
+		C.unsigned(C.SGD_SM3), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
 		(*C.uchar)(unsafe.Pointer(&id[0])), C.unsigned(len(id))))
 }
 
 // Sm3Update:sm3 update
-func Sm3Update(session int, buf []byte) RV {
-	return RV(C.hash_update(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
-		C.unsigned(len(buf))))
+func Sm3Update(session HANDLE, buf []byte) RV {
+	return RV(C.hash_update((*C.long)(unsafe.Pointer(session)),
+		(*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(buf))))
 }
 
 // SdfSm3Update:sm3 final，返回32字节的hash数组
-func Sm3Final(session int) ([]byte, RV) {
+func Sm3Final(session HANDLE) ([]byte, RV) {
 	var len C.unsigned = 32 // sm3 hash长度固定32字节
 	hash := make([]byte, 32)
 
-	ret := C.hash_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])),
+	ret := C.hash_final((*C.long)(unsafe.Pointer(session)),
+		(*C.uchar)(unsafe.Pointer(&hash[0])),
 		(*C.unsigned)(unsafe.Pointer(&len)))
 
 	return hash, RV(ret)
 }
 
 // Sm3HMACInit:hmac-sm3,此处暂时匹配sw卡,跟2023标准暂不一致
-func Sm3HMACInit(session int, kekIndex uint32, key []byte) RV {
-	return RV(C.hmac_init(C.long(session), C.unsigned(C.SGD_SM3),
-		C.unsigned(kekIndex),
+func Sm3HMACInit(session HANDLE, kekIndex uint32, key []byte) RV {
+	return RV(C.hmac_init((*C.long)(unsafe.Pointer(session)),
+		C.unsigned(C.SGD_SM3), C.unsigned(kekIndex),
 		(*C.uchar)(unsafe.Pointer(&key[0])), C.unsigned(len(key))))
 }
 
 // Sm3HMACUpdate:hmac-sm3 update
-func Sm3HMACUpdate(session int, data []byte) RV {
-	return RV(C.hmac_update(C.long(session),
+func Sm3HMACUpdate(session HANDLE, data []byte) RV {
+	return RV(C.hmac_update((*C.long)(unsafe.Pointer(session)),
 		(*C.uchar)(unsafe.Pointer(&data[0])), C.unsigned(len(data))))
 }
 
 // Sm3HMACFinal:hmac-sm3 final,返回32字节的hash数组
-func Sm3HMACFinal(session int) ([]byte, RV) {
+func Sm3HMACFinal(session HANDLE) ([]byte, RV) {
 	var len C.unsigned = 32 // sm3 hash长度固定32字节
 	hash := make([]byte, 32)
 
-	ret := C.hmac_final(C.long(session), (*C.uchar)(unsafe.Pointer(&hash[0])),
+	ret := C.hmac_final((*C.long)(unsafe.Pointer(session)),
+		(*C.uchar)(unsafe.Pointer(&hash[0])),
 		(*C.unsigned)(unsafe.Pointer(&len)))
 
 	return hash, RV(ret)
 }
 
 // GenerateKeyWithKEK: 生成会话密钥并导出,密钥会用PKCS7填充
-func GenerateKeyWithKEK(session int, kekIndex uint32, keyBits uint32) ([]byte, int, RV) {
+func GenerateKeyWithKEK(session HANDLE, kekIndex uint32, keyBits uint32) ([]byte, HANDLE, RV) {
 	buf := make([]byte, 256)
 	var keyLen C.unsigned
-	var ret C.unsigned
+	var keyHandle HANDLE
 
-	handle := C.gen_key_with_kek(C.long(session), C.unsigned(keyBits),
-		C.unsigned(C.SGD_SMS4_ECB), C.unsigned(kekIndex),
+	ret := C.gen_key_with_kek((*C.long)(unsafe.Pointer(session)),
+		C.unsigned(keyBits), C.unsigned(C.SGD_SMS4_ECB), C.unsigned(kekIndex),
 		(*C.uchar)(unsafe.Pointer(&buf[0])), (*C.unsigned)(unsafe.Pointer(&keyLen)),
-		(*C.unsigned)(unsafe.Pointer(&ret)))
+		(**C.long)(unsafe.Pointer(&keyHandle)))
 	if ret != 0 {
-		return nil, 0, RV(ret)
+		return nil, nil, RV(ret)
 	}
 
 	keyBuf := make([]byte, keyLen)
 	copy(keyBuf, buf[:keyLen])
-	return keyBuf, int(handle), RV(ret)
+	return keyBuf, keyHandle, RV(ret)
 }
 
 // ImportKeyWithKEK: 导入并解密会话密钥
-func ImportKeyWithKEK(session int, kekIndex uint32, key []byte) (int, RV) {
-	var ret C.unsigned
+func ImportKeyWithKEK(session HANDLE, kekIndex uint32, key []byte) (HANDLE, RV) {
+	var keyHandle HANDLE
 
-	handle := C.import_key_with_kek(C.long(session), C.unsigned(C.SGD_SMS4_ECB),
+	ret := C.import_key_with_kek((*C.long)(unsafe.Pointer(session)),
+		C.unsigned(C.SGD_SMS4_ECB),
 		C.unsigned(kekIndex), (*C.uchar)(unsafe.Pointer(&key[0])),
-		C.unsigned(len(key)), (*C.unsigned)(unsafe.Pointer(&ret)))
+		C.unsigned(len(key)), (**C.long)(unsafe.Pointer(&keyHandle)))
 
-	return int(handle), RV(ret)
+	return keyHandle, RV(ret)
 }
 
 // DestroyKey:销毁会话密钥,释放密钥句柄
-func DestroyKey(session, keyHandle int) RV {
-	return RV(C.destroy_key(C.long(session), C.long(keyHandle)))
+func DestroyKey(session, keyHandle HANDLE) RV {
+	return RV(C.destroy_key((*C.long)(unsafe.Pointer(keyHandle)),
+		(*C.long)(unsafe.Pointer(keyHandle))))
 }
 
 // SM4EncryptECB:sm4加密，ECB模式，调用者须填充
-func SM4EncryptECB(session, keyHandle int, data []byte) ([]byte, RV) {
+func SM4EncryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	iv := make([]byte, 16)
 	var outLen C.unsigned = 0
 
-	ret := C.encrypt(C.long(session), C.long(keyHandle), C.unsigned(C.SGD_SMS4_ECB),
+	ret := C.encrypt((*C.long)(unsafe.Pointer(session)),
+		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_ECB),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
@@ -418,11 +415,12 @@ func SM4EncryptECB(session, keyHandle int, data []byte) ([]byte, RV) {
 }
 
 // SM4EncryptCBC:sm4加密，CBC模式，调用者须填充
-func SM4EncryptCBC(session, keyHandle int, iv, data []byte) ([]byte, RV) {
+func SM4EncryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	var outLen C.unsigned = 0
 
-	ret := C.encrypt(C.long(session), C.long(keyHandle), C.unsigned(C.SGD_SMS4_CBC),
+	ret := C.encrypt((*C.long)(unsafe.Pointer(session)),
+		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_CBC),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
@@ -430,12 +428,13 @@ func SM4EncryptCBC(session, keyHandle int, iv, data []byte) ([]byte, RV) {
 }
 
 // SM4DecryptECB:sm4解密，ECB模式
-func SM4DecryptECB(session, keyHandle int, data []byte) ([]byte, RV) {
+func SM4DecryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	iv := make([]byte, 16)
 	var outLen C.unsigned = 0
 
-	ret := C.decrypt(C.long(session), C.long(keyHandle), C.unsigned(C.SGD_SMS4_ECB),
+	ret := C.decrypt((*C.long)(unsafe.Pointer(session)),
+		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_ECB),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
@@ -443,11 +442,12 @@ func SM4DecryptECB(session, keyHandle int, data []byte) ([]byte, RV) {
 }
 
 // SM4DecryptCBC:sm4解密，CBC模式
-func SM4DecryptCBC(session, keyHandle int, iv, data []byte) ([]byte, RV) {
+func SM4DecryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	var outLen C.unsigned = 0
 
-	ret := C.decrypt(C.long(session), C.long(keyHandle), C.unsigned(C.SGD_SMS4_CBC),
+	ret := C.decrypt((*C.long)(unsafe.Pointer(session)),
+		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_CBC),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
@@ -460,11 +460,12 @@ func SM4DecryptCBC(session, keyHandle int, iv, data []byte) ([]byte, RV) {
 // 2. 使用SM3计算消息HASH,再对HASH进行CBC-MAC计算
 // 3. 填充数据到固定长度
 // 4. 使用另一个KEY加密CBC-MAC作为最终MAC
-func SM4CalculateCBCMAC(session, keyHandle int, iv []byte, data []byte) ([]byte, RV) {
+func SM4CalculateCBCMAC(session, key HANDLE, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, 16) // SM4 CBC-MAC固定16字节
 	var outLen C.unsigned = 0
 
-	ret := C.cbc_mac(C.long(session), C.long(keyHandle), C.unsigned(C.SGD_SMS4_MAC),
+	ret := C.cbc_mac((*C.long)(unsafe.Pointer(session)),
+		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_MAC),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
@@ -473,25 +474,29 @@ func SM4CalculateCBCMAC(session, keyHandle int, iv []byte, data []byte) ([]byte,
 }
 
 // Sm2ExtKeyVerify:sm2外部key验签
-func Sm2ExtKeyVerify(session int, pubKey ECCrefPublicKey, buf []byte, sig ECCSignature) RV {
-	return RV(C.external_verify_ecc(C.long(session), C.unsigned(C.SGD_SM2_1),
-		(*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)), (*C.uchar)(unsafe.Pointer(&buf[0])),
+func Sm2ExtKeyVerify(session HANDLE, pubKey ECCrefPublicKey, buf []byte, sig ECCSignature) RV {
+	return RV(C.external_verify_ecc((*C.long)(unsafe.Pointer(session)),
+		C.unsigned(C.SGD_SM2_1),
+		(*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
+		(*C.uchar)(unsafe.Pointer(&buf[0])),
 		C.unsigned(len(buf)), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }
 
 // CreateFile:卡中创建文件
-func CreateFile(session int, fileName string, fileSize uint32) RV {
+func CreateFile(session HANDLE, fileName string, fileSize uint32) RV {
 	buf := make([]byte, len(fileName))
-	return RV(C.create_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
+	return RV(C.create_file((*C.long)(unsafe.Pointer(session)),
+		(*C.uchar)(unsafe.Pointer(&buf[0])),
 		C.unsigned(len(fileName)), C.unsigned(fileSize)))
 }
 
 // ReadFile:读取卡中文件,从offset开始读取readLen字节
-func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, RV) {
+func ReadFile(session HANDLE, fileName string, offSet, readLen uint32) ([]byte, RV) {
 	fileBytes := make([]byte, len(fileName))
 	buf := make([]byte, readLen) //读取文件buf
 
-	ret := C.read_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])),
+	ret := C.read_file((*C.long)(unsafe.Pointer(session)),
+		(*C.uchar)(unsafe.Pointer(&fileBytes[0])),
 		C.unsigned(len(fileName)), C.unsigned(offSet),
 		(*C.unsigned)(unsafe.Pointer(&readLen)),
 		(*C.uchar)(unsafe.Pointer(&buf[0])))
@@ -500,17 +505,19 @@ func ReadFile(session int, fileName string, offSet, readLen uint32) ([]byte, RV)
 }
 
 // WriteFile:文件写入内容,从offset开始写入readLen字节
-func WriteFile(session int, fileName string, offSet uint32, buf []byte) RV {
+func WriteFile(session HANDLE, fileName string, offSet uint32, buf []byte) RV {
 	fileBytes := make([]byte, len(fileName))
-	return RV(C.write_file(C.long(session), (*C.uchar)(unsafe.Pointer(&fileBytes[0])),
+	return RV(C.write_file((*C.long)(unsafe.Pointer(session)),
+		(*C.uchar)(unsafe.Pointer(&fileBytes[0])),
 		C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(len(buf)),
 		(*C.uchar)(unsafe.Pointer(&buf[0]))))
 }
 
 // DeleteFile:删除卡中文件
-func DeleteFile(session int, fileName string) RV {
+func DeleteFile(session HANDLE, fileName string) RV {
 	buf := make([]byte, len(fileName))
-	return RV(C.delete_file(C.long(session), (*C.uchar)(unsafe.Pointer(&buf[0])),
+	return RV(C.delete_file((*C.long)(unsafe.Pointer(session)),
+		(*C.uchar)(unsafe.Pointer(&buf[0])),
 		C.unsigned(len(fileName))))
 }
 
@@ -523,7 +530,8 @@ func GenerateRandom(len int) ([]byte, RV) {
 	defer CloseSession(session)
 
 	buf := make([]byte, len)
-	ret = RV(C.gen_random(C.long(session), C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
+	ret = RV(C.gen_random((*C.long)(unsafe.Pointer(session)),
+		C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
 	return buf, ret
 }
 
