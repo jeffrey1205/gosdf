@@ -357,10 +357,10 @@ typedef struct EPRIMAC_Head_st
 #define SGD_RSA_SIGN	0x00010100
 #define SGD_RSA_ENC		0x00010200
 
-#define SGD_SM2			0x00020100
-#define SGD_SM2_1		0x00020200
-#define SGD_SM2_2		0x00020400
-#define SGD_SM2_3		0x00020800
+#define SGD_SM2			0x00020100  // SM2算法
+#define SGD_SM2_1		0x00020200  // SM2签名
+#define SGD_SM2_2		0x00020400  // SM2密钥交换
+#define SGD_SM2_3		0x00020800  // SM2加密
 
 #define SGD_SM3			0x00000001
 #define SGD_SHA1		0x00000002

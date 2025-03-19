@@ -42,6 +42,7 @@ const (
 const (
 	ECCref_MAX_BITS              int32 = 512
 	ECCref_MAX_LEN               int32 = ((ECCref_MAX_BITS + 7) / 8)
+	ECCref_MAX_CIPHER_LEN        int32 = 136
 	ECC_MAX_XCOORDINATE_BITS_LEN int32 = 512
 	ECC_MAX_YCOORDINATE_BITS_LEN int32 = ECC_MAX_XCOORDINATE_BITS_LEN
 	ECC_MAX_MODULUS_BITS_LEN     int32 = ECC_MAX_XCOORDINATE_BITS_LEN
@@ -63,7 +64,7 @@ type ECCCipher struct {
 	Y [ECCref_MAX_LEN]byte
 	M [32]byte
 	L uint32
-	C [1]byte
+	C [ECCref_MAX_CIPHER_LEN]byte
 }
 
 type ECCSignature struct {
