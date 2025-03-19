@@ -63,8 +63,8 @@ type ECCCipher struct {
 	X [ECCref_MAX_LEN]byte
 	Y [ECCref_MAX_LEN]byte
 	M [32]byte
-	L uint32
-	C [ECCref_MAX_CIPHER_LEN]byte
+	L uint32                      // 密文长度,单位字节
+	C [ECCref_MAX_CIPHER_LEN]byte // 密文内容,更长的加密需求使用数字信封
 }
 
 type ECCSignature struct {
