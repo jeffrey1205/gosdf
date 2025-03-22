@@ -465,14 +465,14 @@ func ImportKeyWithISKECC(session HANDLE, keyIndex uint32, cipher ECCCipher) (HAN
 	return keyHandle, RV(ret)
 }
 
-// GenerateKeyWithKEK: 生成会话密钥并导出,密钥会用PKCS7填充
-func GenerateKeyWithKEK(session HANDLE, kekIndex uint32, keyBits uint32) ([]byte, HANDLE, RV) {
+// GenerateKeyWithKEK: 生成会话密钥并导出,算法选用ECB模式,密钥会用PKCS7填充
+func GenerateKeyWithKEK(session HANDLE, kekIndex uint32, alg ALGID, keyBits uint32) ([]byte, HANDLE, RV) {
 	buf := make([]byte, 256)
 	var keyLen C.unsigned
 	var keyHandle HANDLE
 
 	ret := C.gen_key_with_kek((*C.long)(unsafe.Pointer(session)),
-		C.unsigned(keyBits), C.unsigned(C.SGD_SMS4_ECB), C.unsigned(kekIndex),
+		C.unsigned(keyBits), C.unsigned(alg), C.unsigned(kekIndex),
 		(*C.uchar)(unsafe.Pointer(&buf[0])), (*C.unsigned)(unsafe.Pointer(&keyLen)),
 		(**C.long)(unsafe.Pointer(&keyHandle)))
 	if ret != 0 {
@@ -484,13 +484,12 @@ func GenerateKeyWithKEK(session HANDLE, kekIndex uint32, keyBits uint32) ([]byte
 	return keyBuf, keyHandle, RV(ret)
 }
 
-// ImportKeyWithKEK: 导入并解密会话密钥
-func ImportKeyWithKEK(session HANDLE, kekIndex uint32, key []byte) (HANDLE, RV) {
+// ImportKeyWithKEK: 导入并解密会话密钥,算法选用ECB模式
+func ImportKeyWithKEK(session HANDLE, kekIndex uint32, alg ALGID, key []byte) (HANDLE, RV) {
 	var keyHandle HANDLE
 
 	ret := C.import_key_with_kek((*C.long)(unsafe.Pointer(session)),
-		C.unsigned(C.SGD_SMS4_ECB),
-		C.unsigned(kekIndex), (*C.uchar)(unsafe.Pointer(&key[0])),
+		C.unsigned(alg), C.unsigned(kekIndex), (*C.uchar)(unsafe.Pointer(&key[0])),
 		C.unsigned(len(key)), (**C.long)(unsafe.Pointer(&keyHandle)))
 
 	return keyHandle, RV(ret)
@@ -540,58 +539,52 @@ func ExternalEncryptECC(session HANDLE, pubKey ECCrefPublicKey, data []byte) (EC
 	return cipher, RV(ret)
 }
 
-// SM4EncryptECB:sm4加密，ECB模式，调用者须填充
-func SM4EncryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
+// Encrypt: 根据指定算法加密,不对数据进行填充
+func Encrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
-	iv := make([]byte, 16)
 	var outLen C.unsigned = 0
 
-	ret := C.encrypt((*C.long)(unsafe.Pointer(session)),
-		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_ECB),
+	ret := RV(C.encrypt((*C.long)(unsafe.Pointer(session)),
+		(*C.long)(unsafe.Pointer(key)), C.unsigned(alg),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
-		(*C.unsigned)(unsafe.Pointer(&outLen)))
-	return outBuf, RV(ret)
+		(*C.unsigned)(unsafe.Pointer(&outLen))))
+	return outBuf, ret
+}
+
+// SM4EncryptECB:sm4加密，ECB模式，调用者须填充
+func SM4EncryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
+	iv := make([]byte, 16)
+	return Encrypt(session, key, SM4_ECB, iv, data)
 }
 
 // SM4EncryptCBC:sm4加密，CBC模式，调用者须填充
 func SM4EncryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
+	return Encrypt(session, key, SM4_CBC, iv, data)
+}
+
+// Decrypt: 根据指定算法解密
+func Decrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	var outLen C.unsigned = 0
 
-	ret := C.encrypt((*C.long)(unsafe.Pointer(session)),
-		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_CBC),
+	ret := RV(C.decrypt((*C.long)(unsafe.Pointer(session)),
+		(*C.long)(unsafe.Pointer(key)), C.unsigned(alg),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
-		(*C.unsigned)(unsafe.Pointer(&outLen)))
-	return outBuf, RV(ret)
+		(*C.unsigned)(unsafe.Pointer(&outLen))))
+	return outBuf, ret
 }
 
 // SM4DecryptECB:sm4解密，ECB模式
 func SM4DecryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
-	outBuf := make([]byte, len(data))
 	iv := make([]byte, 16)
-	var outLen C.unsigned = 0
-
-	ret := C.decrypt((*C.long)(unsafe.Pointer(session)),
-		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_ECB),
-		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
-		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
-		(*C.unsigned)(unsafe.Pointer(&outLen)))
-	return outBuf, RV(ret)
+	return Decrypt(session, key, SM4_ECB, iv, data)
 }
 
 // SM4DecryptCBC:sm4解密，CBC模式
 func SM4DecryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
-	outBuf := make([]byte, len(data))
-	var outLen C.unsigned = 0
-
-	ret := C.decrypt((*C.long)(unsafe.Pointer(session)),
-		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_CBC),
-		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
-		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
-		(*C.unsigned)(unsafe.Pointer(&outLen)))
-	return outBuf, RV(ret)
+	return Decrypt(session, key, SM4_CBC, iv, data)
 }
 
 // SM4CalculateCBCMAC:计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制.该函数不填充

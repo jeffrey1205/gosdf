@@ -284,7 +284,6 @@ typedef struct EPRIMAC_Head_st
 #define SGD_FALSE		0x00000000
 
 /*算法标识*/
-
 #define SGD_SM1_ECB		0x00000101
 #define SGD_SM1_CBC		0x00000102
 #define SGD_SM1_CFB		0x00000104

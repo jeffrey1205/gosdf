@@ -20,6 +20,7 @@ func TestSm3Hash(t *testing.T) {
 	sm3 := New()
 	sm3.Write([]byte("test"))
 	fmt.Printf("SM3 Hash: %x\n", sm3.Sum(nil))
+	fmt.Printf("SM3 Hash: %x\n", Sm3Sum([]byte("test")))
 }
 
 func TestHmacSm3(t *testing.T) {

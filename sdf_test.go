@@ -25,7 +25,7 @@ func TestSm4Enc(t *testing.T) {
 		return
 	}
 
-	key, keyHandle, ret := GenerateKeyWithKEK(session, 1, 128)
+	key, keyHandle, ret := GenerateKeyWithKEK(session, 1, SM4_ECB, 128)
 	if ret != SDR_OK {
 		fmt.Printf("SDF GenerateKeyWithKEK error: %x\n", ret)
 		CloseSession(session)
@@ -56,7 +56,7 @@ func TestSm4Dec(t *testing.T) {
 		return
 	}
 
-	keyHandle, ret := ImportKeyWithKEK(session, 1, sessionKey)
+	keyHandle, ret := ImportKeyWithKEK(session, 1, SM4_ECB, sessionKey)
 	if ret != SDR_OK {
 		fmt.Printf("SDF ImportKeyWithKEK error: %x\n", ret)
 		CloseSession(session)
@@ -87,7 +87,7 @@ func TestSm4MAC(t *testing.T) {
 		return
 	}
 
-	keyHandle, ret := ImportKeyWithKEK(session, 1, sessionKey)
+	keyHandle, ret := ImportKeyWithKEK(session, 1, SM4_ECB, sessionKey)
 	if ret != SDR_OK {
 		fmt.Printf("SDF ImportKeyWithKEK error: %x\n", ret)
 		CloseSession(session)
@@ -203,7 +203,7 @@ func TestSm4MultiThread(t *testing.T) {
 
 		fmt.Printf("[1]session: %x\n", session)
 
-		keyHandle, ret := ImportKeyWithKEK(session, 1, sessionKey)
+		keyHandle, ret := ImportKeyWithKEK(session, 1, SM4_ECB, sessionKey)
 		if ret != SDR_OK {
 			fmt.Printf("SDF ImportKeyWithKEK error: %x\n", ret)
 			CloseSession(session)
@@ -236,7 +236,7 @@ func TestSm4MultiThread(t *testing.T) {
 
 		fmt.Printf("[2]session: %x\n", session)
 
-		keyHandle, ret := ImportKeyWithKEK(session, 1, sessionKey)
+		keyHandle, ret := ImportKeyWithKEK(session, 1, SM4_ECB, sessionKey)
 		if ret != SDR_OK {
 			fmt.Printf("SDF ImportKeyWithKEK error: %x\n", ret)
 			CloseSession(session)
