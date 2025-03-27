@@ -312,11 +312,10 @@ RV gen_random(long *session, UINT32 len, UCHAR *buf)
 */
 import "C"
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"math/big"
 	"unsafe"
+
+	"github.com/emmansun/gmsm/padding"
 )
 
 // Init:模块初始化,打开device、so库,查找符号表
@@ -552,14 +551,22 @@ func Encrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV
 	return outBuf, ret
 }
 
-// SM4EncryptECB:sm4加密，ECB模式，调用者须填充
+// SM4EncryptECB:sm4加密，ECB模式，无需填充
 func SM4EncryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
-	iv := make([]byte, 16)
+	iv := make([]byte, SM4_BLOCKSIZE)
+	if len(data)%SM4_BLOCKSIZE != 0 { // 不是满分组进行填充
+		pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7Padding
+		data = pad.Pad(data)
+	}
 	return Encrypt(session, key, SM4_ECB, iv, data)
 }
 
-// SM4EncryptCBC:sm4加密，CBC模式，调用者须填充
+// SM4EncryptCBC:sm4加密，CBC模式，无需填充
 func SM4EncryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
+	if len(data)%SM4_BLOCKSIZE != 0 { // 不是满分组进行填充
+		pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7Padding
+		data = pad.Pad(data)
+	}
 	return Encrypt(session, key, SM4_CBC, iv, data)
 }
 
@@ -578,24 +585,42 @@ func Decrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV
 
 // SM4DecryptECB:sm4解密，ECB模式
 func SM4DecryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
-	iv := make([]byte, 16)
-	return Decrypt(session, key, SM4_ECB, iv, data)
+	iv := make([]byte, SM4_BLOCKSIZE)
+	pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7 UnPadding
+	plainText, err := Decrypt(session, key, SM4_ECB, iv, data)
+	if err != 0 {
+		return nil, err
+	}
+
+	plainText, errPad := pad.Unpad(plainText)
+	if errPad != nil {
+		return nil, SDR_FILESIZEERR
+	}
+	return plainText, err
 }
 
 // SM4DecryptCBC:sm4解密，CBC模式
 func SM4DecryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
-	return Decrypt(session, key, SM4_CBC, iv, data)
+	pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7 UnPadding
+	plainText, err := Decrypt(session, key, SM4_CBC, iv, data)
+	if err != 0 {
+		return nil, err
+	}
+
+	plainText, errPad := pad.Unpad(plainText)
+	if errPad != nil {
+		return nil, SDR_FILESIZEERR
+	}
+	return plainText, err
 }
 
-// SM4CalculateCBCMAC:计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制.该函数不填充
-// CBC-MAC在长度不固定时有长度扩展攻击问题.建议以下方式使用:
-// 1. 使用ISO9797-1 M3填充方式(首选)
-// 2. 使用SM3计算消息HASH,再对HASH进行CBC-MAC计算
-// 3. 填充数据到固定长度
-// 4. 使用另一个KEY加密CBC-MAC作为最终MAC
+// SM4CalculateCBCMAC:计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
+// CBC-MAC在长度不固定时有长度扩展攻击问题.使用ISO9797-1 M3填充方式抵御攻击
 func SM4CalculateCBCMAC(session, key HANDLE, iv []byte, data []byte) ([]byte, RV) {
-	outBuf := make([]byte, 16) // SM4 CBC-MAC固定16字节
+	outBuf := make([]byte, SM4_BLOCKSIZE) // SM4 CBC-MAC固定16字节
 	var outLen C.unsigned = 0
+	pad := padding.NewISO9797M3Padding(uint(SM4_BLOCKSIZE)) // M3 Padding
+	data = pad.Pad(data)
 
 	ret := C.cbc_mac((*C.long)(unsafe.Pointer(session)),
 		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_MAC),
@@ -657,36 +682,4 @@ func GenerateRandom(len int) ([]byte, RV) {
 	ret = RV(C.gen_random((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
 	return buf, ret
-}
-
-// GB/T 17964-2021 附录C.4 填充方法3, 生成块L,单位为Byte
-// ISO9797M3Padding 实现M3填充, 生成块L,单位为Bit
-func ISO9797M3Padding(data []byte, blockSize int) ([]byte, error) {
-	if blockSize <= 0 {
-		return nil, errors.New("block size must be positive")
-	}
-
-	// 计算原始数据的字节长度
-	ld := uint64(len(data))
-
-	// 右填充0x00到块大小的整数倍
-	dataLen := len(data)
-	paddingBytes := (blockSize - (dataLen % blockSize)) % blockSize
-	paddedData := append(data, bytes.Repeat([]byte{0x00}, paddingBytes)...)
-
-	// 生成块L：将ld的二进制表示左填充到blockSize字节
-	lBlock := make([]byte, blockSize)
-	ldBytes := big.NewInt(0).SetUint64(ld).Bytes() // 转换为大端字节
-
-	// 若ld的字节表示超过块大小，返回错误
-	if len(ldBytes) > blockSize {
-		return nil, errors.New("data length exceeds block size capacity")
-	}
-
-	// 将ldBytes左填充到blockSize长度
-	padStart := blockSize - len(ldBytes)
-	copy(lBlock[padStart:], ldBytes)
-
-	// 合并块L和填充后的数据
-	return append(lBlock, paddedData...), nil
 }

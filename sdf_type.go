@@ -83,6 +83,8 @@ const (
 	ECC_MAX_MODULUS_BITS_LEN     int32 = ECC_MAX_XCOORDINATE_BITS_LEN
 )
 
+const SM4_BLOCKSIZE int = 16
+
 type ECCrefPublicKey struct {
 	Bits uint32
 	X    [ECCref_MAX_LEN]byte

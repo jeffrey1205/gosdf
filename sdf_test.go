@@ -173,16 +173,6 @@ func TestSm3HMAC(t *testing.T) {
 	fmt.Printf("HMAC Final ret %x, hash: %x\n", ret, hash)
 }
 
-func TestISO9797M3Padding(t *testing.T) {
-	data1, _ := hex.DecodeString("00112233445566778899")
-	padded, _ := ISO9797M3Padding(data1, 16)
-	fmt.Printf("data1 padded: %x\n", padded)
-
-	data2, _ := hex.DecodeString("00112233445566778899AABBCCDDEEFF")
-	padded, _ = ISO9797M3Padding(data2, 16)
-	fmt.Printf("data2 padded: %x\n", padded)
-}
-
 func TestSm4MultiThread(t *testing.T) {
 	if err := Init(enginePath); err != nil {
 		fmt.Println("SDF Init error:", err)
