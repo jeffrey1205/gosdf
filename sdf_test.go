@@ -137,11 +137,11 @@ func TestSm3(t *testing.T) {
 	}
 
 	//55E12E91650D2FEC56EC74E1D3E4DDBFCE2EF3A65890C2A19ECF88A307E76A23
-	if ret := Sm3Update(session, []byte("test")); ret != SDR_OK {
+	if ret := HashUpdate(session, []byte("test")); ret != SDR_OK {
 		fmt.Printf("SM3 Update error: %x\n", ret)
 	}
 
-	hash, ret := Sm3Final(session)
+	hash, ret := HashFinal(session)
 	fmt.Printf("SM3 Final ret %x, hash: %x\n", ret, hash)
 }
 
@@ -305,8 +305,8 @@ func TestSm2(t *testing.T) {
 		return
 	}
 
-	_ = Sm3Update(session, []byte("test"))
-	hash, ret := Sm3Final(session)
+	_ = HashUpdate(session, []byte("test"))
+	hash, ret := HashFinal(session)
 	fmt.Printf("sm3 hash pre handle: %x ret: %x\n", hash, ret)
 
 	ret = GetPrivateKeyAccessRight(session, 1, []byte("12345678"))
@@ -318,10 +318,22 @@ func TestSm2(t *testing.T) {
 	sig, ret := InternalSignECC(session, 1, hash)
 	fmt.Printf("sig: %x, ret: %x\n", sig, ret)
 
+	sm2Sig, ret := Sm2InternalSign(session, 1, hash)
+	fmt.Printf("sm2 sig: %x, ret: %x\n", sm2Sig, ret)
+
+	sm2Sig, ret = Sm2SignData(1, []byte("test"))
+	fmt.Printf("sm2 sign data: %x, ret: %x\n", sm2Sig, ret)
+
 	ReleasePrivateKeyAccessRight(session, 1)
 
 	ret = InternalVerifyECC(session, 1, hash, sig)
 	fmt.Printf("verify ret: %x\n", ret)
+
+	ret = Sm2InternalVerify(session, 1, hash, sm2Sig)
+	fmt.Printf("sm2 verify ret: %x\n", ret)
+
+	ret = Sm2VerifyData(1, []byte("test"), sm2Sig)
+	fmt.Printf("sm2 verify data ret: %x\n", ret)
 
 	// 加密
 	cipherText, ret := ExternalEncryptECC(session, encPub, []byte("test"))

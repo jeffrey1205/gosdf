@@ -47,7 +47,7 @@ func (sm3 *SM3) Reset() {
 }
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
-	if ret := sdf.Sm3Update(sm3.session, p); ret != sdf.SDR_OK {
+	if ret := sdf.HashUpdate(sm3.session, p); ret != sdf.SDR_OK {
 		return 0, fmt.Errorf("sm3 update error: %d", ret)
 	}
 
@@ -59,7 +59,7 @@ func (sm3 *SM3) Sum(in []byte) []byte {
 		_, _ = sm3.Write(in)
 	}
 
-	hash, ret := sdf.Sm3Final(sm3.session)
+	hash, ret := sdf.HashFinal(sm3.session)
 	if ret != sdf.SDR_OK {
 		panic(fmt.Sprintf("session %d final error: %d", sm3.session, ret))
 	}

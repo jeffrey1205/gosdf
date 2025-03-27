@@ -314,8 +314,6 @@ import "C"
 import (
 	"fmt"
 	"unsafe"
-
-	"github.com/emmansun/gmsm/padding"
 )
 
 // Init:模块初始化,打开device、so库,查找符号表
@@ -355,35 +353,29 @@ func ReleasePrivateKeyAccessRight(session HANDLE, kekIndex uint32) RV {
 	return RV(C.release_pin((*C.long)(unsafe.Pointer(session)), C.unsigned(kekIndex)))
 }
 
-// Sm3Init:sm3 init，传入打开的会话
-func Sm3Init(session HANDLE) RV {
+// HashInit: HASH初始化
+func HashInit(session HANDLE, alg ALGID, pubKey *ECCrefPublicKey, id []byte) RV {
 	return RV(C.hash_init((*C.long)(unsafe.Pointer(session)),
-		C.unsigned(C.SGD_SM3), nil, nil, 0))
-}
-
-// Sm3InitWithPubKey:sm3 init，传入打开的会话,公钥进行预处理，用于签名验签
-func Sm3InitWithPubKey(session HANDLE, pubKey ECCrefPublicKey, id []byte) RV {
-	return RV(C.hash_init((*C.long)(unsafe.Pointer(session)),
-		C.unsigned(C.SGD_SM3), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
+		C.unsigned(alg), (*C.ECCrefPublicKey)(unsafe.Pointer(pubKey)),
 		(*C.uchar)(unsafe.Pointer(&id[0])), C.unsigned(len(id))))
 }
 
-// Sm3Update:sm3 update
-func Sm3Update(session HANDLE, buf []byte) RV {
+// HashUpdate:hash update
+func HashUpdate(session HANDLE, buf []byte) RV {
 	return RV(C.hash_update((*C.long)(unsafe.Pointer(session)),
 		(*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(buf))))
 }
 
-// SdfSm3Update:sm3 final，返回32字节的hash数组
-func Sm3Final(session HANDLE) ([]byte, RV) {
-	var len C.unsigned = 32 // sm3 hash长度固定32字节
-	hash := make([]byte, 32)
+// HashFinal:hash final
+func HashFinal(session HANDLE) ([]byte, RV) {
+	var len C.unsigned = 64
+	hash := make([]byte, 64)
 
 	ret := C.hash_final((*C.long)(unsafe.Pointer(session)),
 		(*C.uchar)(unsafe.Pointer(&hash[0])),
 		(*C.unsigned)(unsafe.Pointer(&len)))
 
-	return hash, RV(ret)
+	return hash[:len], RV(ret)
 }
 
 // Sm3HMACInit:hmac-sm3,此处暂时匹配sw卡,跟2023标准暂不一致
@@ -501,13 +493,13 @@ func DestroyKey(session, keyHandle HANDLE) RV {
 }
 
 // 以下几个签名、验签函数,须传入经过预处理后的HASH值,不能直接传递消息原文
-// ExternalKeyVerifyECC:ECC外部签名公钥验签
-func ExternalKeyVerifyECC(session HANDLE, pubKey ECCrefPublicKey, buf []byte, sig ECCSignature) RV {
+// ExternalVerifyECC:ECC外部签名公钥验签
+func ExternalVerifyECC(session HANDLE, pubKey ECCrefPublicKey, hash []byte, sig ECCSignature) RV {
 	return RV(C.external_verify_ecc((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(C.SGD_SM2_1),
 		(*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
-		(*C.uchar)(unsafe.Pointer(&buf[0])),
-		C.unsigned(len(buf)), (*C.ECCSignature)(unsafe.Pointer(&sig))))
+		(*C.uchar)(unsafe.Pointer(&hash[0])),
+		C.unsigned(len(hash)), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }
 
 // InternalSignECC:内部ECC签名私钥签名
@@ -551,25 +543,6 @@ func Encrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV
 	return outBuf, ret
 }
 
-// SM4EncryptECB:sm4加密，ECB模式，无需填充
-func SM4EncryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
-	iv := make([]byte, SM4_BLOCKSIZE)
-	if len(data)%SM4_BLOCKSIZE != 0 { // 不是满分组进行填充
-		pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7Padding
-		data = pad.Pad(data)
-	}
-	return Encrypt(session, key, SM4_ECB, iv, data)
-}
-
-// SM4EncryptCBC:sm4加密，CBC模式，无需填充
-func SM4EncryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
-	if len(data)%SM4_BLOCKSIZE != 0 { // 不是满分组进行填充
-		pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7Padding
-		data = pad.Pad(data)
-	}
-	return Encrypt(session, key, SM4_CBC, iv, data)
-}
-
 // Decrypt: 根据指定算法解密
 func Decrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
@@ -583,47 +556,14 @@ func Decrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV
 	return outBuf, ret
 }
 
-// SM4DecryptECB:sm4解密，ECB模式
-func SM4DecryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
-	iv := make([]byte, SM4_BLOCKSIZE)
-	pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7 UnPadding
-	plainText, err := Decrypt(session, key, SM4_ECB, iv, data)
-	if err != 0 {
-		return nil, err
-	}
-
-	plainText, errPad := pad.Unpad(plainText)
-	if errPad != nil {
-		return nil, SDR_FILESIZEERR
-	}
-	return plainText, err
-}
-
-// SM4DecryptCBC:sm4解密，CBC模式
-func SM4DecryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
-	pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7 UnPadding
-	plainText, err := Decrypt(session, key, SM4_CBC, iv, data)
-	if err != 0 {
-		return nil, err
-	}
-
-	plainText, errPad := pad.Unpad(plainText)
-	if errPad != nil {
-		return nil, SDR_FILESIZEERR
-	}
-	return plainText, err
-}
-
-// SM4CalculateCBCMAC:计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
-// CBC-MAC在长度不固定时有长度扩展攻击问题.使用ISO9797-1 M3填充方式抵御攻击
-func SM4CalculateCBCMAC(session, key HANDLE, iv []byte, data []byte) ([]byte, RV) {
+// CalculateMAC:CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
+// CBC-MAC在长度不固定时有长度扩展攻击问题
+func CalculateMAC(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, SM4_BLOCKSIZE) // SM4 CBC-MAC固定16字节
 	var outLen C.unsigned = 0
-	pad := padding.NewISO9797M3Padding(uint(SM4_BLOCKSIZE)) // M3 Padding
-	data = pad.Pad(data)
 
 	ret := C.cbc_mac((*C.long)(unsafe.Pointer(session)),
-		(*C.long)(unsafe.Pointer(key)), C.unsigned(C.SGD_SMS4_MAC),
+		(*C.long)(unsafe.Pointer(key)), C.unsigned(alg),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))

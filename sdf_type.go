@@ -1,5 +1,7 @@
 package gosdf
 
+import "math/big"
+
 // 数据类型
 type HANDLE *int
 type ALGID uint32
@@ -34,6 +36,14 @@ const (
 	AES_OFB ALGID = 0x00008008
 	AES_MAC ALGID = 0x00008010
 	AES_CTR ALGID = 0x00008020
+
+	SGD_SM3    ALGID = 0x00000001
+	SGD_SHA1   ALGID = 0x00000002
+	SGD_SHA256 ALGID = 0x00000004
+	SGD_SHA512 ALGID = 0x00000008
+	SGD_SHA384 ALGID = 0x00000010
+	SGD_SHA224 ALGID = 0x00000020
+	SGD_MD5    ALGID = 0x00000080
 )
 
 // 错误码定义
@@ -96,6 +106,7 @@ type ECCrefPrivateKey struct {
 	K    [ECCref_MAX_LEN]byte
 }
 
+// ECC加密结果. GM/T 0018格式
 type ECCCipher struct {
 	X [ECCref_MAX_LEN]byte
 	Y [ECCref_MAX_LEN]byte
@@ -104,9 +115,21 @@ type ECCCipher struct {
 	C [ECCref_MAX_CIPHER_LEN]byte // 密文内容,更长的加密需求使用数字信封
 }
 
+type sm2Cipher struct {
+	XCoordinate *big.Int
+	YCoordinate *big.Int
+	HASH        []byte
+	CipherText  []byte
+}
+
+// 数字签名结果. GM/T 0018格式
 type ECCSignature struct {
 	R [ECCref_MAX_LEN]byte
 	S [ECCref_MAX_LEN]byte
+}
+
+type sm2Signature struct {
+	R, S *big.Int
 }
 
 type ECCPUBLICKEYBLOB struct {
@@ -120,5 +143,5 @@ type ECCCIPHERBLOB struct {
 	YCoordinate [ECC_MAX_XCOORDINATE_BITS_LEN / 8]byte
 	Hash        [32]byte
 	CipherLen   uint32
-	Cipher      [128]byte
+	Cipher      [ECCref_MAX_CIPHER_LEN]byte
 }
