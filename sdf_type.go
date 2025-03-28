@@ -116,10 +116,10 @@ type ECCCipher struct {
 }
 
 type sm2Cipher struct {
-	XCoordinate *big.Int
-	YCoordinate *big.Int
-	HASH        []byte
-	CipherText  []byte
+	X          *big.Int
+	Y          *big.Int
+	HASH       []byte
+	CipherText []byte
 }
 
 // 数字签名结果. GM/T 0018格式

@@ -299,7 +299,7 @@ func TestSm2(t *testing.T) {
 	}
 
 	// 预处理
-	ret = Sm3InitWithPubKey(session, signPub, []byte("1234567812345678"))
+	ret = HashInit(session, SGD_SM3, &signPub, []byte("1234567812345678"))
 	if ret != SDR_OK {
 		fmt.Printf("SDF sm3 hash pre handle error: %x\n", ret)
 		return

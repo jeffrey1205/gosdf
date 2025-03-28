@@ -2,6 +2,7 @@ package gosdf
 
 import (
 	"encoding/asn1"
+	"errors"
 	"math/big"
 )
 
@@ -30,18 +31,81 @@ func SignatureUnmarshal(sig []byte) (ECCSignature, error) {
 	return eccSig, nil
 }
 
-// Sm2ExternalVerify:ECC外部签名公钥验签,验证ASN.1格式签名
-func Sm2ExternalVerify(session HANDLE, pubKey ECCrefPublicKey, hash []byte, sig []byte) RV {
+// PublicKeyMarshal: 将ECCrefPublicKey转换为04||x||y
+func PublicKeyMarshal(pubKey ECCrefPublicKey) []byte {
+	// 暂时不支持压缩格式
+	key := []byte{0x04}
+	key = append(key, pubKey.X[32:]...)
+	key = append(key, pubKey.Y[32:]...)
+	return key
+}
+
+// PublicKeyUmmarshal: 将04||x||y转换为ECCrefPublicKey
+func PublicKeyUmmarshal(pubkey []byte) (ECCrefPublicKey, error) {
+	var pub ECCrefPublicKey
+
+	if len(pubkey) != 65 || pubkey[0] != 0x04 {
+		return pub, errors.New("Invalid public key format")
+	}
+
+	pub.Bits = 256
+	copy(pub.X[32:], pubkey[1:33])
+	copy(pub.Y[32:], pubkey[33:])
+	return pub, nil
+}
+
+// CipherMarshal: 将ECCCipher转换为ASN.1格式
+func CipherMarshal(ciphertext ECCCipher) ([]byte, error) {
+	sm2Cipher := sm2Cipher{
+		X:          new(big.Int).SetBytes(ciphertext.X[32:]),
+		Y:          new(big.Int).SetBytes(ciphertext.Y[32:]),
+		HASH:       ciphertext.M[:],
+		CipherText: ciphertext.C[:ciphertext.L],
+	}
+	return asn1.Marshal(sm2Cipher)
+}
+
+// CipherUnmarshal: 将ASN.1格式签名转换为ECCCipher结构
+func CipherUnmarshal(ciphertext []byte) (ECCCipher, error) {
+	var sm2Cipher sm2Cipher
+
+	_, err := asn1.Unmarshal(ciphertext, &sm2Cipher)
+	if err != nil {
+		return ECCCipher{}, err
+	}
+
+	// 使用SM3 Hash必须为32字节长度,CipherText最大为128字节
+	if len(sm2Cipher.HASH) != 32 ||
+		len(sm2Cipher.CipherText) > int(ECCref_MAX_CIPHER_LEN) {
+		return ECCCipher{}, errors.New("Invalid cipher format")
+	}
+
+	eccCipher := ECCCipher{}
+	copy(eccCipher.X[32:], sm2Cipher.X.Bytes())
+	copy(eccCipher.Y[32:], sm2Cipher.Y.Bytes())
+	copy(eccCipher.M[:], sm2Cipher.HASH)
+	eccCipher.L = uint32(len(sm2Cipher.CipherText))
+	copy(eccCipher.C[:], sm2Cipher.CipherText)
+
+	return eccCipher, nil
+}
+
+// Sm2PubkeyVerify:ECC外部签名公钥验签,验证ASN.1格式签名
+func Sm2PubkeyVerify(session HANDLE, pubKey []byte, hash []byte, sig []byte) RV {
 	sm2Sig, err := SignatureUnmarshal(sig)
 	if err != nil {
 		return SDR_INARGERR
 	}
 
-	return ExternalVerifyECC(session, pubKey, hash, sm2Sig)
+	pub, err := PublicKeyUmmarshal(pubKey)
+	if err != nil {
+		return SDR_INARGERR
+	}
+	return ExternalVerifyECC(session, pub, hash, sm2Sig)
 }
 
-// Sm2ExternalVerifyData:ECC外部签名公钥验签,直接对数据验证ASN.1格式签名
-func Sm2ExternalVerifyData(pubKey ECCrefPublicKey, data []byte, sig []byte) RV {
+// Sm2PubkeyVerifyData:ECC外部签名公钥验签,直接对数据验证ASN.1格式签名
+func Sm2PubkeyVerifyData(pubKey []byte, data []byte, sig []byte) RV {
 	session, ret := OpenSession()
 	if ret != SDR_OK {
 		return ret
@@ -64,7 +128,49 @@ func Sm2ExternalVerifyData(pubKey ECCrefPublicKey, data []byte, sig []byte) RV {
 		return ret
 	}
 
-	return Sm2ExternalVerify(session, pubKey, hash, sig)
+	return Sm2PubkeyVerify(session, pubKey, hash, sig)
+}
+
+// Sm2ExportEncPublicKey:导出加密公钥,返回04||x||y格式
+func Sm2ExportEncPublicKey(keyIndex uint32) ([]byte, RV) {
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return nil, ret
+	}
+	defer CloseSession(session)
+
+	pubKey, ret := ExportEncPublicKeyECC(session, keyIndex)
+	if ret != SDR_OK {
+		return nil, ret
+	}
+
+	return PublicKeyMarshal(pubKey), SDR_OK
+}
+
+// Sm2Encrypt:使用公钥加密
+func Sm2Encrypt(pubKey []byte, data []byte) ([]byte, RV) {
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return nil, ret
+	}
+	defer CloseSession(session)
+
+	pub, err := PublicKeyUmmarshal(pubKey)
+	if err != nil {
+		return nil, SDR_INARGERR
+	}
+
+	cipherEcc, ret := ExternalEncryptECC(session, pub, data)
+	if err != nil {
+		return nil, ret
+	}
+
+	cipher, err := CipherMarshal(cipherEcc)
+	if err != nil {
+		return nil, SDR_INARGERR
+	}
+
+	return cipher, SDR_OK
 }
 
 // Sm2InternalSign:内部ECC签名私钥签名,生成ASN.1格式签名
@@ -97,7 +203,7 @@ func Sm2SignData(keyIndex uint32, data []byte) ([]byte, RV) {
 	}
 
 	// 对数据预处理,使用默认用户ID
-	ret = Sm3InitWithPubKey(session, signPub, defaultID)
+	ret = HashInit(session, SGD_SM3, &signPub, defaultID)
 	if ret != SDR_OK {
 		return nil, ret
 	}
@@ -140,7 +246,7 @@ func Sm2VerifyData(keyIndex uint32, data, sig []byte) RV {
 	}
 
 	// 对数据预处理,使用默认用户ID
-	ret = Sm3InitWithPubKey(session, signPub, defaultID)
+	ret = HashInit(session, SGD_SM3, &signPub, defaultID)
 	if ret != SDR_OK {
 		return ret
 	}
