@@ -2,59 +2,104 @@ package gosdf
 
 import "github.com/emmansun/gmsm/padding"
 
-// SM4EncryptECB:sm4加密，ECB模式，无需填充
-func SM4EncryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
-	iv := make([]byte, SM4_BLOCKSIZE)
-	if len(data)%SM4_BLOCKSIZE != 0 { // 不是满分组进行填充
-		pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7Padding
-		data = pad.Pad(data)
-	}
-	return Encrypt(session, key, SM4_ECB, iv, data)
+type Sm4Crypter struct {
+	session   HANDLE
+	keyHandle HANDLE
+	KeyByte   []byte
+	Pad       bool // 每次调用不满整分组是否填充,PKCS7
+	mode      ALGID
+	p7pad     padding.Padding // 加密使用
+	m3pad     padding.Padding // MAC使用
 }
 
-// SM4EncryptCBC:sm4加密，CBC模式，无需填充
-func SM4EncryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
-	if len(data)%SM4_BLOCKSIZE != 0 { // 不是满分组进行填充
-		pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7Padding
-		data = pad.Pad(data)
+// ECB模式初始IV均为0
+var zeroIV = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+
+// Sm4New:新建一个SM4加密器
+func Sm4New(mode ALGID, pad bool) *Sm4Crypter {
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return nil
 	}
-	return Encrypt(session, key, SM4_CBC, iv, data)
+
+	return &Sm4Crypter{
+		session:   session,
+		keyHandle: nil,
+		mode:      mode,
+		p7pad:     padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)),
+		m3pad:     padding.NewISO9797M3Padding(uint(SM4_BLOCKSIZE)),
+		KeyByte:   nil,
+		Pad:       pad,
+	}
 }
 
-// SM4DecryptECB:sm4解密，ECB模式
-func SM4DecryptECB(session, key HANDLE, data []byte) ([]byte, RV) {
-	iv := make([]byte, SM4_BLOCKSIZE)
-	pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7 UnPadding
-	plainText, err := Decrypt(session, key, SM4_ECB, iv, data)
+func (c *Sm4Crypter) Destroy() {
+	if c.keyHandle != nil {
+		DestroyKey(c.session, c.keyHandle)
+	} else if c.session != nil {
+		CloseSession(c.session)
+	}
+}
+
+// GenerateKey:使用内部密钥生成SM4会话密钥
+func (c *Sm4Crypter) NewKey(kek uint32) RV {
+	key, handle, ret := GenerateKeyWithKEK(c.session, kek, SM4_ECB, uint32(SM4_BLOCKSIZE))
+	if ret != SDR_OK {
+		return ret
+	}
+
+	c.keyHandle = handle
+	c.KeyByte = key
+	return SDR_OK
+}
+
+// SetKey:import会话密钥
+func (c *Sm4Crypter) SetKey(kek uint32, key []byte) RV {
+	handle, ret := ImportKeyWithKEK(c.session, kek, SM4_CBC, key)
+	if ret != SDR_OK {
+		return ret
+	}
+
+	c.keyHandle = handle
+	return SDR_OK
+}
+
+// Encrypt:sm4加密，CBC等需要IV、Nonce模式须16字节IV,ECB可不填
+func (c *Sm4Crypter) Encrypt(iv, data []byte) ([]byte, RV) {
+	if c.Pad && len(data)%SM4_BLOCKSIZE != 0 { // 不是满分组进行填充
+		data = c.p7pad.Pad(data)
+	}
+
+	if iv == nil { // 此处补上空IV,防止传入空IV导致panic
+		iv = zeroIV
+	}
+
+	return Encrypt(c.session, c.keyHandle, c.mode, iv, data)
+}
+
+// Decrypt:sm4解密，CBC等需要IV、Nonce模式须16字节IV,ECB可不填
+func (c *Sm4Crypter) Decrypt(iv, data []byte) ([]byte, RV) {
+	if iv == nil { // 此处补上空IV,防止传入空IV导致panic
+		iv = zeroIV
+	}
+
+	plainText, err := Decrypt(c.session, c.keyHandle, c.mode, iv, data)
 	if err != 0 {
 		return nil, err
 	}
 
-	plainText, errPad := pad.Unpad(plainText)
-	if errPad != nil {
-		return nil, SDR_FILESIZEERR
+	if c.Pad { // 此处有可能没有填充
+		plainText, _ = c.p7pad.Unpad(plainText)
 	}
 	return plainText, err
 }
 
-// SM4DecryptCBC:sm4解密，CBC模式
-func SM4DecryptCBC(session, key HANDLE, iv, data []byte) ([]byte, RV) {
-	pad := padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)) // PKCS7 UnPadding
-	plainText, err := Decrypt(session, key, SM4_CBC, iv, data)
-	if err != 0 {
-		return nil, err
-	}
-
-	plainText, errPad := pad.Unpad(plainText)
-	if errPad != nil {
-		return nil, SDR_FILESIZEERR
-	}
-	return plainText, err
-}
-
-// SM4CalculateCBCMAC:计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
+// CBCMAC:计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
 // CBC-MAC在长度不固定时有长度扩展攻击问题.使用ISO9797-1 M3填充方式抵御攻击
-func SM4CalculateCBCMAC(session, key HANDLE, iv []byte, data []byte) ([]byte, RV) {
-	pad := padding.NewISO9797M3Padding(uint(SM4_BLOCKSIZE)) // M3 Padding
-	return CalculateMAC(session, key, SM4_MAC, iv, pad.Pad(data))
+func (c *Sm4Crypter) CBCMAC(iv []byte, data []byte) ([]byte, RV) {
+	if c.Pad {
+		return CalculateMAC(c.session, c.keyHandle, SM4_MAC, iv, c.m3pad.Pad(data))
+	}
+	return CalculateMAC(c.session, c.keyHandle, SM4_MAC, iv, data)
 }
