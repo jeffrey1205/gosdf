@@ -2,12 +2,13 @@ package gosdf
 
 import "github.com/emmansun/gmsm/padding"
 
-type Sm4Crypter struct {
-	session   HANDLE
-	keyHandle HANDLE
-	KeyByte   []byte
-	Pad       bool // 每次调用不满整分组是否填充,PKCS7
-	mode      ALGID
+type BlockCrypter struct {
+	session   HANDLE          // 会话句柄
+	keyHandle HANDLE          // 密钥句柄
+	keyByte   []byte          // 密钥密文
+	blockSize uint            // 分组长度
+	pad       bool            // 每次调用不满整分组是否填充,PKCS7
+	mode      ALGID           // 加密/MAC模式
 	p7pad     padding.Padding // 加密使用
 	m3pad     padding.Padding // MAC使用
 }
@@ -16,25 +17,36 @@ type Sm4Crypter struct {
 var zeroIV = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
-// Sm4New:新建一个SM4加密器
-func Sm4New(mode ALGID, pad bool) *Sm4Crypter {
-	session, ret := OpenSession()
-	if ret != SDR_OK {
+// NewCrypter:新建一个分组模式加密器
+func NewCrypter(mode ALGID, blockSize uint, pad bool) *BlockCrypter {
+	session, err := OpenSession()
+	if err != nil {
 		return nil
 	}
 
-	return &Sm4Crypter{
+	return &BlockCrypter{
 		session:   session,
 		keyHandle: nil,
 		mode:      mode,
-		p7pad:     padding.NewPKCS7Padding(uint(SM4_BLOCKSIZE)),
-		m3pad:     padding.NewISO9797M3Padding(uint(SM4_BLOCKSIZE)),
-		KeyByte:   nil,
-		Pad:       pad,
+		p7pad:     padding.NewPKCS7Padding(uint(blockSize)),
+		m3pad:     padding.NewISO9797M3Padding(uint(blockSize)),
+		keyByte:   nil,
+		pad:       pad,
 	}
 }
 
-func (c *Sm4Crypter) Destroy() {
+// Key:获取会话密钥密文
+func (c *BlockCrypter) Key() []byte {
+	return c.keyByte
+}
+
+// EnablePad:开启或者禁用填充
+func (c *BlockCrypter) EnablePad(pad bool) {
+	c.pad = pad
+}
+
+// Destroy:释放密钥和会话句柄,释放资源
+func (c *BlockCrypter) Destroy() {
 	if c.keyHandle != nil {
 		DestroyKey(c.session, c.keyHandle)
 	} else if c.session != nil {
@@ -42,64 +54,64 @@ func (c *Sm4Crypter) Destroy() {
 	}
 }
 
-// GenerateKey:使用内部密钥生成SM4会话密钥
-func (c *Sm4Crypter) NewKey(kek uint32) RV {
-	key, handle, ret := GenerateKeyWithKEK(c.session, kek, SM4_ECB, uint32(SM4_BLOCKSIZE))
-	if ret != SDR_OK {
-		return ret
+// GenerateKey:使用内部密钥生成会话密钥,用SM4-ECB加密
+func (c *BlockCrypter) NewKey(kek uint32) error {
+	key, handle, err := GenerateKeyWithKEK(c.session, kek, SM4_ECB, uint32(c.blockSize)*8)
+	if err != nil {
+		return err
 	}
 
 	c.keyHandle = handle
-	c.KeyByte = key
-	return SDR_OK
+	c.keyByte = key
+	return nil
 }
 
 // SetKey:import会话密钥
-func (c *Sm4Crypter) SetKey(kek uint32, key []byte) RV {
-	handle, ret := ImportKeyWithKEK(c.session, kek, SM4_CBC, key)
-	if ret != SDR_OK {
-		return ret
+func (c *BlockCrypter) SetKey(kek uint32, key []byte) error {
+	handle, err := ImportKeyWithKEK(c.session, kek, SM4_CBC, key)
+	if err != nil {
+		return err
 	}
 
 	c.keyHandle = handle
-	return SDR_OK
+	return nil
 }
 
-// Encrypt:sm4加密，CBC等需要IV、Nonce模式须16字节IV,ECB可不填
-func (c *Sm4Crypter) Encrypt(iv, data []byte) ([]byte, RV) {
-	if c.Pad && len(data)%SM4_BLOCKSIZE != 0 { // 不是满分组进行填充
-		data = c.p7pad.Pad(data)
+// Encrypt:加密，CBC等需要IV、Nonce模式须16字节IV,ECB可不填
+func (c *BlockCrypter) Encrypt(iv, plain []byte) ([]byte, error) {
+	if c.pad && len(plain)%int(c.blockSize) != 0 { // 不是满分组进行填充
+		plain = c.p7pad.Pad(plain)
 	}
 
 	if iv == nil { // 此处补上空IV,防止传入空IV导致panic
 		iv = zeroIV
 	}
 
-	return Encrypt(c.session, c.keyHandle, c.mode, iv, data)
+	return Encrypt(c.session, c.keyHandle, c.mode, iv, plain)
 }
 
-// Decrypt:sm4解密，CBC等需要IV、Nonce模式须16字节IV,ECB可不填
-func (c *Sm4Crypter) Decrypt(iv, data []byte) ([]byte, RV) {
+// Decrypt:解密，CBC等需要IV、Nonce模式须16字节IV,ECB可不填
+func (c *BlockCrypter) Decrypt(iv, cipher []byte) ([]byte, error) {
 	if iv == nil { // 此处补上空IV,防止传入空IV导致panic
 		iv = zeroIV
 	}
 
-	plainText, err := Decrypt(c.session, c.keyHandle, c.mode, iv, data)
-	if err != 0 {
+	plainText, err := Decrypt(c.session, c.keyHandle, c.mode, iv, cipher)
+	if err != nil {
 		return nil, err
 	}
 
-	if c.Pad { // 此处有可能没有填充
+	if c.pad { // 此处有可能没有填充
 		plainText, _ = c.p7pad.Unpad(plainText)
 	}
 	return plainText, err
 }
 
-// CBCMAC:计算SM4 CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
+// CBCMAC:CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
 // CBC-MAC在长度不固定时有长度扩展攻击问题.使用ISO9797-1 M3填充方式抵御攻击
-func (c *Sm4Crypter) CBCMAC(iv []byte, data []byte) ([]byte, RV) {
-	if c.Pad {
-		return CalculateMAC(c.session, c.keyHandle, SM4_MAC, iv, c.m3pad.Pad(data))
+func (c *BlockCrypter) CBCMAC(iv []byte, data []byte) ([]byte, error) {
+	if c.pad {
+		return CalculateMAC(c.session, c.keyHandle, c.mode, iv, c.m3pad.Pad(data))
 	}
-	return CalculateMAC(c.session, c.keyHandle, SM4_MAC, iv, data)
+	return CalculateMAC(c.session, c.keyHandle, c.mode, iv, data)
 }

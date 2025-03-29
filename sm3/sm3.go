@@ -19,13 +19,13 @@ func (sm3 *SM3) Close() {
 
 // 创建哈希计算实例
 func New() hash.Hash {
-	session, ret := sdf.OpenSession()
-	if ret != sdf.SDR_OK {
-		panic("open session error: " + fmt.Sprint(ret))
+	session, err := sdf.OpenSession()
+	if err != nil {
+		panic("open session error: " + err.Error())
 	}
 
-	if ret := sdf.Sm3Init(session); ret != sdf.SDR_OK {
-		panic(fmt.Sprintf("session %d init error: %d", session, ret))
+	if err := sdf.Sm3Init(session); err != nil {
+		panic(fmt.Sprintf("session %x init error: %v", session, err))
 	}
 
 	sm3 := &SM3{session: session}
@@ -40,15 +40,15 @@ func New() hash.Hash {
 func (sm3 *SM3) BlockSize() int { return 64 }
 
 // Size returns the number of bytes Sum will return.
-func (sm3 *SM3) Size() int { return 32 }
+func (sm3 *SM3) Size() int { return sdf.Sm3HashSize }
 
 func (sm3 *SM3) Reset() {
 	// 是否需要重新调用sm3init？
 }
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
-	if ret := sdf.HashUpdate(sm3.session, p); ret != sdf.SDR_OK {
-		return 0, fmt.Errorf("sm3 update error: %d", ret)
+	if err := sdf.HashUpdate(sm3.session, p); err != nil {
+		return 0, fmt.Errorf("sm3 update error: %v", err.Error())
 	}
 
 	return len(p), nil
@@ -59,9 +59,9 @@ func (sm3 *SM3) Sum(in []byte) []byte {
 		_, _ = sm3.Write(in)
 	}
 
-	hash, ret := sdf.HashFinal(sm3.session)
-	if ret != sdf.SDR_OK {
-		panic(fmt.Sprintf("session %d final error: %d", sm3.session, ret))
+	hash, err := sdf.HashFinal(sm3.session)
+	if err != nil {
+		panic(fmt.Sprintf("session %x final error: %v", sm3.session, err))
 	}
 
 	return hash
