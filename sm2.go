@@ -279,3 +279,7 @@ func Sm2VerifyData(keyIndex uint32, data, sig []byte) error {
 	// 对HASH签名验签
 	return Sm2InternalVerify(session, keyIndex, hash, sig)
 }
+
+// TODO:数字信封 SM2-SM4-CBC
+// 封装:GenerateKeyWithEPKECC/Encrypt
+// 解封:ImportKeyWithISKECC/Decrypt

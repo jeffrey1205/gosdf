@@ -29,11 +29,12 @@ func NewCrypter(mode ALGID, blockSize uint, pad bool) *BlockCrypter {
 	return &BlockCrypter{
 		session:   session,
 		keyHandle: nil,
+		blockSize: blockSize,
+		pad:       pad,
 		mode:      mode,
 		p7pad:     padding.NewPKCS7Padding(uint(blockSize)),
 		m3pad:     padding.NewISO9797M3Padding(uint(blockSize)),
 		keyByte:   nil,
-		pad:       pad,
 	}
 }
 
@@ -70,7 +71,7 @@ func (c *BlockCrypter) NewKey(kek uint32) error {
 
 // SetKey:import会话密钥
 func (c *BlockCrypter) SetKey(kek uint32, key []byte) error {
-	handle, ret := ImportKeyWithKEK(c.session, kek, SM4_CBC, key)
+	handle, ret := ImportKeyWithKEK(c.session, kek, SM4_ECB, key)
 	if ret != SDR_OK {
 		return ret.Error()
 	}
@@ -108,7 +109,11 @@ func (c *BlockCrypter) Decrypt(iv, cipher []byte) ([]byte, error) {
 	}
 
 	if c.pad { // 此处有可能没有填充
-		plainText, _ = c.p7pad.Unpad(plainText)
+		if unPadText, err := c.p7pad.Unpad(plainText); err != nil {
+			return plainText, nil // 去填充失败,可能没有填充.返回原数据
+		} else {
+			return unPadText, nil
+		}
 	}
 	return plainText, nil
 }

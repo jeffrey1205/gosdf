@@ -14,22 +14,40 @@ func TestSm4Enc(t *testing.T) {
 	}
 	defer Exit()
 
-	crypter := NewCrypter(SM4_CBC, uint(Sm4BlockSize), true)
-	if crypter == nil {
+	// 加密测试
+	encCrypter := NewCrypter(SM4_CBC, uint(Sm4BlockSize), true)
+	if encCrypter == nil {
 		fmt.Println("SM4 New error")
 		return
 	}
-	defer crypter.Destroy()
+	defer encCrypter.Destroy()
 
-	err := crypter.NewKey(1)
+	err := encCrypter.NewKey(1)
 	if err != nil {
 		fmt.Printf("SDF NewKey error: %v\n", err)
 		return
 	}
 
-	cipherText, err := crypter.Encrypt([]byte("1234567890abcdef"),
+	cipherText, err := encCrypter.Encrypt([]byte("1234567890abcdef"),
 		[]byte("test1111test1111"))
-	fmt.Printf("Ciper %x, err %v", cipherText, err)
+	fmt.Printf("Cipher %x, err %v\n", cipherText, err)
+
+	// 解密测试
+	decCrypter := NewCrypter(SM4_CBC, uint(Sm4BlockSize), true)
+	if decCrypter == nil {
+		fmt.Println("SM4 New error")
+		return
+	}
+	defer decCrypter.Destroy()
+
+	err = decCrypter.SetKey(1, encCrypter.Key())
+	if err != nil {
+		fmt.Printf("SDF SetKey error: %v\n", err)
+		return
+	}
+
+	plainText, err := decCrypter.Decrypt([]byte("1234567890abcdef"), cipherText)
+	fmt.Printf("Plain %s, err %v\n", plainText, err)
 }
 
 func TestSm4MAC(t *testing.T) {
@@ -39,7 +57,7 @@ func TestSm4MAC(t *testing.T) {
 	}
 	defer Exit()
 
-	crypter := NewCrypter(SM4_CBC, uint(Sm4BlockSize), true)
+	crypter := NewCrypter(SM4_MAC, uint(Sm4BlockSize), true)
 	if crypter == nil {
 		fmt.Println("SM4 New error")
 		return
@@ -53,7 +71,7 @@ func TestSm4MAC(t *testing.T) {
 	}
 
 	mac, err := crypter.CBCMAC(zeroIV, []byte("test1111test1111"))
-	fmt.Printf("mac %x, err %v", mac, err)
+	fmt.Printf("mac %x, err %v\n", mac, err)
 }
 
 func TestSm2(t *testing.T) {
@@ -62,6 +80,13 @@ func TestSm2(t *testing.T) {
 		return
 	}
 	defer Exit()
+
+	// 导出公钥
+	pubKey, err := Sm2ExportEncPublicKey(1)
+	fmt.Printf("sm2 public key: %x, err: %v\n", pubKey, err)
+	// 公钥加密
+	cipherText, err := Sm2Encrypt(pubKey, []byte("test"))
+	fmt.Printf("sm2 cipher: %x, err: %v\n", cipherText, err)
 
 	// 签名验签
 	sm2Sig, err := Sm2SignData(1, []byte("test"))
