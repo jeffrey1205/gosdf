@@ -26,11 +26,6 @@ RV (*HashInit)(HANDLE, UINT32, ECCrefPublicKey *, UCHAR *, UINT32);
 RV (*HashUpdate)(HANDLE, UCHAR *, UINT32);
 RV (*HashFinal)(HANDLE, UCHAR *, UINT32 *);
 
-//HMAC运算函数:该实现为三未信安提供,跟0018-2023不一致
-RV (*HMACInit)(HANDLE, UINT32, UINT32, UCHAR*, UINT32);
-RV (*HMACUpdate)(HANDLE, UCHAR*, UINT32);
-RV (*HMACFinal)(HANDLE, UCHAR*, UINT32*);
-
 //密钥管理
 RV (*ExportSignPublicKeyECC)(HANDLE, UINT32, ECCrefPublicKey *);
 RV (*ExportEncPublicKeyECC)(HANDLE, UINT32, ECCrefPublicKey *);
@@ -67,7 +62,7 @@ struct func_name_pair
 	long **func; 	//函数指针
 };
 
-int plugin_init(char *path)
+RV plugin_init(char *path)
 {
 	int i;
 	long *sym;
@@ -82,12 +77,6 @@ int plugin_init(char *path)
 		{"SDF_HashInit", (long **)&HashInit},
 		{"SDF_HashUpdate", (long **)&HashUpdate},
 		{"SDF_HashFinal", (long **)&HashFinal},
-
-#ifdef SW_GM0018_2012
-		{"SDF_HMAC_Init", (long **)&HMACInit},
-		{"SDF_HMAC_Update", (long **)&HMACUpdate},
-		{"SDF_HMAC_Final", (long **)&HMACFinal},
-#endif
 
 		{"SDF_ExportSignPublicKey_ECC", (long **)&ExportSignPublicKeyECC},
 		{"SDF_ExportEncPublicKey_ECC", (long **)&ExportEncPublicKeyECC},
@@ -118,8 +107,7 @@ int plugin_init(char *path)
 	gs_lib_handle = dlopen(path, RTLD_LAZY);
 	if (gs_lib_handle == NULL)
 	{
-		printf("open %s error\n", path);
-		return -1;
+		return SDR_OPENDEVICE;
 	}
 
 	//查找符号
@@ -128,7 +116,6 @@ int plugin_init(char *path)
 		sym = (long *)dlsym(gs_lib_handle, gs_func_name_arr[i].name);
 		if (sym == NULL)
 		{
-			printf("lookup %s error\n", gs_func_name_arr[i].name);
 			goto error;
 		}
 
@@ -138,13 +125,12 @@ int plugin_init(char *path)
 	//打开设备
 	if (!OpenDevice(&gs_sdf_device))
 	{
-		return 0;
+		return SDR_OK;
 	}
-	printf("open device error\n");
 
 error:
 	dlclose(gs_lib_handle);
-	return -2;
+	return SDR_NOTSUPPORT;
 }
 
 void plugin_exit(void)
@@ -183,21 +169,6 @@ RV hash_update(long *session, UCHAR *buf, UINT32 buf_len)
 RV hash_final(long *session, UCHAR *hash, UINT32 *hash_len)
 {
 	return HashFinal((HANDLE)session, hash, hash_len);
-}
-
-RV hmac_init(long *session, UINT32 alg, UINT32 kek, UCHAR* pucKey, UINT32 key_len)
-{
-	return HMACInit((HANDLE)session, alg, kek, pucKey, key_len);
-}
-
-RV hmac_update(long *session, UCHAR* data, UINT32 data_len)
-{
-	return HMACUpdate((HANDLE)session, data, data_len);
-}
-
-RV hmac_final(long *session, UCHAR* mac, UINT32* mac_len)
-{
-	return HMACFinal((HANDLE)session, mac, mac_len);
 }
 
 RV verify_pin(long *session, UINT32 key_index, UCHAR *pin, UINT32 pin_len)
@@ -312,17 +283,12 @@ RV gen_random(long *session, UINT32 len, UCHAR *buf)
 */
 import "C"
 import (
-	"fmt"
 	"unsafe"
 )
 
 // Init:模块初始化,打开device、so库,查找符号表
-func Init(libPath string) error {
-	if ret := C.plugin_init(C.CString(libPath)); ret != 0 {
-		return fmt.Errorf("sdf_sym_init error: %d", ret)
-	}
-
-	return nil
+func Init(libPath string) RV {
+	return RV(C.plugin_init(C.CString(libPath)))
 }
 
 // Exit:模块退出
@@ -331,43 +297,43 @@ func Exit() {
 }
 
 // OpenSession:打开会话,成功返回session_id >0,失败返回0和错误码
-func OpenSession() (HANDLE, error) {
+func OpenSession() (HANDLE, RV) {
 	var session HANDLE
 	ret := C.open_session((**C.long)(unsafe.Pointer(&session)))
-	return HANDLE(session), rv(ret).Error()
+	return HANDLE(session), RV(ret)
 }
 
 // CloseSession:关闭会话
-func CloseSession(session HANDLE) error {
-	return rv(C.close_session((*C.long)(unsafe.Pointer(session)))).Error()
+func CloseSession(session HANDLE) RV {
+	return RV(C.close_session((*C.long)(unsafe.Pointer(session))))
 }
 
 // GetPrivateKeyAccessRight:获取私钥访问权限,内部私钥签名、解密需要此权限
-func GetPrivateKeyAccessRight(session HANDLE, kekIndex uint32, passwd []byte) error {
-	return rv(C.verify_pin((*C.long)(unsafe.Pointer(session)), C.unsigned(kekIndex),
-		(*C.uchar)(unsafe.Pointer(&passwd[0])), C.unsigned(len(passwd)))).Error()
+func GetPrivateKeyAccessRight(session HANDLE, kekIndex uint32, passwd []byte) RV {
+	return RV(C.verify_pin((*C.long)(unsafe.Pointer(session)), C.unsigned(kekIndex),
+		(*C.uchar)(unsafe.Pointer(&passwd[0])), C.unsigned(len(passwd))))
 }
 
 // ReleasePrivateKeyAccessRight:释放私钥访问权限
-func ReleasePrivateKeyAccessRight(session HANDLE, kekIndex uint32) error {
-	return rv(C.release_pin((*C.long)(unsafe.Pointer(session)), C.unsigned(kekIndex))).Error()
+func ReleasePrivateKeyAccessRight(session HANDLE, kekIndex uint32) RV {
+	return RV(C.release_pin((*C.long)(unsafe.Pointer(session)), C.unsigned(kekIndex)))
 }
 
 // HashInit: HASH初始化
-func HashInit(session HANDLE, alg ALGID, pubKey *ECCrefPublicKey, id []byte) error {
-	return rv(C.hash_init((*C.long)(unsafe.Pointer(session)),
+func HashInit(session HANDLE, alg ALGID, pubKey *ECCrefPublicKey, id []byte) RV {
+	return RV(C.hash_init((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(alg), (*C.ECCrefPublicKey)(unsafe.Pointer(pubKey)),
-		(*C.uchar)(unsafe.Pointer(&id[0])), C.unsigned(len(id)))).Error()
+		(*C.uchar)(unsafe.Pointer(&id[0])), C.unsigned(len(id))))
 }
 
 // HashUpdate:hash update
-func HashUpdate(session HANDLE, buf []byte) error {
-	return rv(C.hash_update((*C.long)(unsafe.Pointer(session)),
-		(*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(buf)))).Error()
+func HashUpdate(session HANDLE, buf []byte) RV {
+	return RV(C.hash_update((*C.long)(unsafe.Pointer(session)),
+		(*C.uchar)(unsafe.Pointer(&buf[0])), C.unsigned(len(buf))))
 }
 
 // HashFinal:hash final
-func HashFinal(session HANDLE) ([]byte, error) {
+func HashFinal(session HANDLE) ([]byte, RV) {
 	var len C.unsigned = 64
 	hash := make([]byte, 64)
 
@@ -375,54 +341,29 @@ func HashFinal(session HANDLE) ([]byte, error) {
 		(*C.uchar)(unsafe.Pointer(&hash[0])),
 		(*C.unsigned)(unsafe.Pointer(&len)))
 
-	return hash[:len], rv(ret).Error()
-}
-
-// Sm3HMACInit:hmac-sm3,此处暂时匹配sw卡,跟2023标准暂不一致
-func Sm3HMACInit(session HANDLE, kekIndex uint32, key []byte) error {
-	return rv(C.hmac_init((*C.long)(unsafe.Pointer(session)),
-		C.unsigned(C.SGD_SM3), C.unsigned(kekIndex),
-		(*C.uchar)(unsafe.Pointer(&key[0])), C.unsigned(len(key)))).Error()
-}
-
-// Sm3HMACUpdate:hmac-sm3 update
-func Sm3HMACUpdate(session HANDLE, data []byte) error {
-	return rv(C.hmac_update((*C.long)(unsafe.Pointer(session)),
-		(*C.uchar)(unsafe.Pointer(&data[0])), C.unsigned(len(data)))).Error()
-}
-
-// Sm3HMACFinal:hmac-sm3 final,返回32字节的hash数组
-func Sm3HMACFinal(session HANDLE) ([]byte, error) {
-	var len C.unsigned = C.unsigned(Sm3HashSize) // sm3 hash长度固定32字节
-	hash := make([]byte, Sm3HashSize)
-
-	ret := C.hmac_final((*C.long)(unsafe.Pointer(session)),
-		(*C.uchar)(unsafe.Pointer(&hash[0])),
-		(*C.unsigned)(unsafe.Pointer(&len)))
-
-	return hash, rv(ret).Error()
+	return hash[:len], RV(ret)
 }
 
 // ExportSignPublicKeyECC:导出ECC签名公钥
-func ExportSignPublicKeyECC(session HANDLE, keyIndex uint32) (ECCrefPublicKey, error) {
+func ExportSignPublicKeyECC(session HANDLE, keyIndex uint32) (ECCrefPublicKey, RV) {
 	var pubKey ECCrefPublicKey
 
 	ret := C.export_sign_pubkey_ecc((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(keyIndex), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)))
-	return pubKey, rv(ret).Error()
+	return pubKey, RV(ret)
 }
 
 // ExportEncPublicKeyECC:导出ECC加密公钥
-func ExportEncPublicKeyECC(session HANDLE, keyIndex uint32) (ECCrefPublicKey, error) {
+func ExportEncPublicKeyECC(session HANDLE, keyIndex uint32) (ECCrefPublicKey, RV) {
 	var pubKey ECCrefPublicKey
 
 	ret := C.export_enc_pubkey_ecc((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(keyIndex), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)))
-	return pubKey, rv(ret).Error()
+	return pubKey, RV(ret)
 }
 
 // GenerateKeyWithIPKECC:生成会话密钥,并用内部ECC加密公钥加密后导出
-func GenerateKeyWithIPKECC(session HANDLE, keyIndex uint32, keyBits uint32) (ECCCipher, HANDLE, error) {
+func GenerateKeyWithIPKECC(session HANDLE, keyIndex uint32, keyBits uint32) (ECCCipher, HANDLE, RV) {
 	var cipher ECCCipher
 	var keyHandle HANDLE
 
@@ -430,11 +371,11 @@ func GenerateKeyWithIPKECC(session HANDLE, keyIndex uint32, keyBits uint32) (ECC
 		C.unsigned(keyIndex), C.unsigned(keyBits),
 		(*C.ECCCipher)(unsafe.Pointer(&cipher)),
 		(**C.long)(unsafe.Pointer(&keyHandle)))
-	return cipher, keyHandle, rv(ret).Error()
+	return cipher, keyHandle, RV(ret)
 }
 
 // GenerateKeyWithEPKECC:生成会话密钥,并用外部ECC加密公钥加密后导出
-func GenerateKeyWithEPKECC(session HANDLE, keyBits uint32, pubKey ECCrefPublicKey) (ECCCipher, HANDLE, error) {
+func GenerateKeyWithEPKECC(session HANDLE, keyBits uint32, pubKey ECCrefPublicKey) (ECCCipher, HANDLE, RV) {
 	var cipher ECCCipher
 	var keyHandle HANDLE
 
@@ -443,21 +384,21 @@ func GenerateKeyWithEPKECC(session HANDLE, keyBits uint32, pubKey ECCrefPublicKe
 		(*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
 		(*C.ECCCipher)(unsafe.Pointer(&cipher)),
 		(**C.long)(unsafe.Pointer(&keyHandle)))
-	return cipher, keyHandle, rv(ret).Error()
+	return cipher, keyHandle, RV(ret)
 }
 
 // ImportKeyWithISKECC:导入会话密钥,并用内部ECC加密私钥解密
-func ImportKeyWithISKECC(session HANDLE, keyIndex uint32, cipher ECCCipher) (HANDLE, error) {
+func ImportKeyWithISKECC(session HANDLE, keyIndex uint32, cipher ECCCipher) (HANDLE, RV) {
 	var keyHandle HANDLE
 
 	ret := C.import_key_with_isk_ecc((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(keyIndex), (*C.ECCCipher)(unsafe.Pointer(&cipher)),
 		(**C.long)(unsafe.Pointer(&keyHandle)))
-	return keyHandle, rv(ret).Error()
+	return keyHandle, RV(ret)
 }
 
 // GenerateKeyWithKEK: 生成会话密钥并导出,算法选用ECB模式,密钥会用PKCS7填充
-func GenerateKeyWithKEK(session HANDLE, kekIndex uint32, alg ALGID, keyBits uint32) ([]byte, HANDLE, error) {
+func GenerateKeyWithKEK(session HANDLE, kekIndex uint32, alg ALGID, keyBits uint32) ([]byte, HANDLE, RV) {
 	buf := make([]byte, 256)
 	var keyLen C.unsigned
 	var keyHandle HANDLE
@@ -467,98 +408,98 @@ func GenerateKeyWithKEK(session HANDLE, kekIndex uint32, alg ALGID, keyBits uint
 		(*C.uchar)(unsafe.Pointer(&buf[0])), (*C.unsigned)(unsafe.Pointer(&keyLen)),
 		(**C.long)(unsafe.Pointer(&keyHandle)))
 	if ret != 0 {
-		return nil, nil, rv(ret).Error()
+		return nil, nil, RV(ret)
 	}
 
 	keyBuf := make([]byte, keyLen)
 	copy(keyBuf, buf[:keyLen])
-	return keyBuf, keyHandle, rv(ret).Error()
+	return keyBuf, keyHandle, RV(ret)
 }
 
 // ImportKeyWithKEK: 导入并解密会话密钥,算法选用ECB模式
-func ImportKeyWithKEK(session HANDLE, kekIndex uint32, alg ALGID, key []byte) (HANDLE, error) {
+func ImportKeyWithKEK(session HANDLE, kekIndex uint32, alg ALGID, key []byte) (HANDLE, RV) {
 	var keyHandle HANDLE
 
 	ret := C.import_key_with_kek((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(alg), C.unsigned(kekIndex), (*C.uchar)(unsafe.Pointer(&key[0])),
 		C.unsigned(len(key)), (**C.long)(unsafe.Pointer(&keyHandle)))
 
-	return keyHandle, rv(ret).Error()
+	return keyHandle, RV(ret)
 }
 
 // DestroyKey:销毁会话密钥,释放密钥句柄
-func DestroyKey(session, keyHandle HANDLE) error {
-	return rv(C.destroy_key((*C.long)(unsafe.Pointer(keyHandle)),
-		(*C.long)(unsafe.Pointer(keyHandle)))).Error()
+func DestroyKey(session, keyHandle HANDLE) RV {
+	return RV(C.destroy_key((*C.long)(unsafe.Pointer(keyHandle)),
+		(*C.long)(unsafe.Pointer(keyHandle))))
 }
 
 // 以下几个签名、验签函数,须传入经过预处理后的HASH值,不能直接传递消息原文
 // ExternalVerifyECC:ECC外部签名公钥验签
-func ExternalVerifyECC(session HANDLE, pubKey ECCrefPublicKey, hash []byte, sig ECCSignature) error {
-	return rv(C.external_verify_ecc((*C.long)(unsafe.Pointer(session)),
+func ExternalVerifyECC(session HANDLE, pubKey ECCrefPublicKey, hash []byte, sig ECCSignature) RV {
+	return RV(C.external_verify_ecc((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(C.SGD_SM2_1),
 		(*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
 		(*C.uchar)(unsafe.Pointer(&hash[0])),
-		C.unsigned(len(hash)), (*C.ECCSignature)(unsafe.Pointer(&sig)))).Error()
+		C.unsigned(len(hash)), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }
 
 // InternalSignECC:内部ECC签名私钥签名
-func InternalSignECC(session HANDLE, keyIndex uint32, hash []byte) (ECCSignature, error) {
+func InternalSignECC(session HANDLE, keyIndex uint32, hash []byte) (ECCSignature, RV) {
 	var sig ECCSignature
 
 	ret := C.internal_sign_ecc((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(keyIndex), (*C.uchar)(unsafe.Pointer(&hash[0])),
 		C.unsigned(len(hash)), (*C.ECCSignature)(unsafe.Pointer(&sig)))
-	return sig, rv(ret).Error()
+	return sig, RV(ret)
 }
 
 // InternalVerifyECC:内部ECC签名公钥验签
-func InternalVerifyECC(session HANDLE, keyIndex uint32, hash []byte, sig ECCSignature) error {
-	return rv(C.internal_verify_ecc((*C.long)(unsafe.Pointer(session)),
+func InternalVerifyECC(session HANDLE, keyIndex uint32, hash []byte, sig ECCSignature) RV {
+	return RV(C.internal_verify_ecc((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(keyIndex), (*C.uchar)(unsafe.Pointer(&hash[0])),
-		C.unsigned(len(hash)), (*C.ECCSignature)(unsafe.Pointer(&sig)))).Error()
+		C.unsigned(len(hash)), (*C.ECCSignature)(unsafe.Pointer(&sig))))
 }
 
 // ExternalEncryptECC:外部ECC加密公钥加密
-func ExternalEncryptECC(session HANDLE, pubKey ECCrefPublicKey, data []byte) (ECCCipher, error) {
+func ExternalEncryptECC(session HANDLE, pubKey ECCrefPublicKey, data []byte) (ECCCipher, RV) {
 	var cipher ECCCipher
 
 	ret := C.external_encrypt_ecc((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(C.SGD_SM2_3), (*C.ECCrefPublicKey)(unsafe.Pointer(&pubKey)),
 		(*C.uchar)(unsafe.Pointer(&data[0])), C.unsigned(len(data)),
 		(*C.ECCCipher)(unsafe.Pointer(&cipher)))
-	return cipher, rv(ret).Error()
+	return cipher, RV(ret)
 }
 
 // Encrypt: 根据指定算法加密,不对数据进行填充
-func Encrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, error) {
+func Encrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	var outLen C.unsigned = 0
 
-	ret := rv(C.encrypt((*C.long)(unsafe.Pointer(session)),
+	ret := RV(C.encrypt((*C.long)(unsafe.Pointer(session)),
 		(*C.long)(unsafe.Pointer(key)), C.unsigned(alg),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen))))
-	return outBuf, ret.Error()
+	return outBuf, ret
 }
 
 // Decrypt: 根据指定算法解密
-func Decrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, error) {
+func Decrypt(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, len(data))
 	var outLen C.unsigned = 0
 
-	ret := rv(C.decrypt((*C.long)(unsafe.Pointer(session)),
+	ret := RV(C.decrypt((*C.long)(unsafe.Pointer(session)),
 		(*C.long)(unsafe.Pointer(key)), C.unsigned(alg),
 		(*C.uchar)(unsafe.Pointer(&iv[0])), (*C.uchar)(unsafe.Pointer(&data[0])),
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen))))
-	return outBuf, ret.Error()
+	return outBuf, ret
 }
 
 // CalculateMAC:CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
 // CBC-MAC在长度不固定时有长度扩展攻击问题
-func CalculateMAC(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, error) {
+func CalculateMAC(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byte, RV) {
 	outBuf := make([]byte, Sm4BlockSize) // SM4 CBC-MAC固定16字节
 	var outLen C.unsigned = 0
 
@@ -568,19 +509,19 @@ func CalculateMAC(session, key HANDLE, alg ALGID, iv []byte, data []byte) ([]byt
 		C.unsigned(len(data)), (*C.uchar)(unsafe.Pointer(&outBuf[0])),
 		(*C.unsigned)(unsafe.Pointer(&outLen)))
 
-	return outBuf, rv(ret).Error()
+	return outBuf, RV(ret)
 }
 
 // CreateFile:卡中创建文件
-func CreateFile(session HANDLE, fileName string, fileSize uint32) error {
+func CreateFile(session HANDLE, fileName string, fileSize uint32) RV {
 	buf := make([]byte, len(fileName))
-	return rv(C.create_file((*C.long)(unsafe.Pointer(session)),
+	return RV(C.create_file((*C.long)(unsafe.Pointer(session)),
 		(*C.uchar)(unsafe.Pointer(&buf[0])),
-		C.unsigned(len(fileName)), C.unsigned(fileSize))).Error()
+		C.unsigned(len(fileName)), C.unsigned(fileSize)))
 }
 
 // ReadFile:读取卡中文件,从offset开始读取readLen字节
-func ReadFile(session HANDLE, fileName string, offSet, readLen uint32) ([]byte, error) {
+func ReadFile(session HANDLE, fileName string, offSet, readLen uint32) ([]byte, RV) {
 	fileBytes := make([]byte, len(fileName))
 	buf := make([]byte, readLen) //读取文件buf
 
@@ -590,36 +531,36 @@ func ReadFile(session HANDLE, fileName string, offSet, readLen uint32) ([]byte, 
 		(*C.unsigned)(unsafe.Pointer(&readLen)),
 		(*C.uchar)(unsafe.Pointer(&buf[0])))
 
-	return buf, rv(ret).Error()
+	return buf, RV(ret)
 }
 
 // WriteFile:文件写入内容,从offset开始写入readLen字节
-func WriteFile(session HANDLE, fileName string, offSet uint32, buf []byte) error {
+func WriteFile(session HANDLE, fileName string, offSet uint32, buf []byte) RV {
 	fileBytes := make([]byte, len(fileName))
-	return rv(C.write_file((*C.long)(unsafe.Pointer(session)),
+	return RV(C.write_file((*C.long)(unsafe.Pointer(session)),
 		(*C.uchar)(unsafe.Pointer(&fileBytes[0])),
 		C.unsigned(len(fileName)), C.unsigned(offSet), C.unsigned(len(buf)),
-		(*C.uchar)(unsafe.Pointer(&buf[0])))).Error()
+		(*C.uchar)(unsafe.Pointer(&buf[0]))))
 }
 
 // DeleteFile:删除卡中文件
-func DeleteFile(session HANDLE, fileName string) error {
+func DeleteFile(session HANDLE, fileName string) RV {
 	buf := make([]byte, len(fileName))
-	return rv(C.delete_file((*C.long)(unsafe.Pointer(session)),
+	return RV(C.delete_file((*C.long)(unsafe.Pointer(session)),
 		(*C.uchar)(unsafe.Pointer(&buf[0])),
-		C.unsigned(len(fileName)))).Error()
+		C.unsigned(len(fileName))))
 }
 
 // GenerateRandom:生成随机数
-func GenerateRandom(len int) ([]byte, error) {
-	session, err := OpenSession()
-	if err != nil {
-		return nil, err
+func GenerateRandom(len int) ([]byte, RV) {
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return nil, ret
 	}
 	defer CloseSession(session)
 
 	buf := make([]byte, len)
-	ret := rv(C.gen_random((*C.long)(unsafe.Pointer(session)),
+	ret = RV(C.gen_random((*C.long)(unsafe.Pointer(session)),
 		C.unsigned(len), (*C.uchar)(unsafe.Pointer(&buf[0]))))
-	return buf, ret.Error()
+	return buf, ret
 }

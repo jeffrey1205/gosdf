@@ -90,7 +90,7 @@ func CipherUnmarshal(ciphertext []byte) (ECCCipher, error) {
 	return eccCipher, nil
 }
 
-// Sm2PubkeyVerify:ECC外部签名公钥验签,验证ASN.1格式签名
+// Sm2PubkeyVerify:ECC外部签名公钥验签,需要先对数据预处理,验证ASN.1格式签名
 func Sm2PubkeyVerify(session HANDLE, pubKey []byte, hash []byte, sig []byte) error {
 	sm2Sig, err := SignatureUnmarshal(sig)
 	if err != nil {
@@ -101,31 +101,40 @@ func Sm2PubkeyVerify(session HANDLE, pubKey []byte, hash []byte, sig []byte) err
 	if err != nil {
 		return err
 	}
-	return ExternalVerifyECC(session, pub, hash, sm2Sig)
+
+	if ret := ExternalVerifyECC(session, pub, hash, sm2Sig); ret != SDR_OK {
+		return ret.Error()
+	}
+	return nil
 }
 
 // Sm2PubkeyVerifyData:ECC外部签名公钥验签,直接对数据验证ASN.1格式签名
 func Sm2PubkeyVerifyData(pubKey []byte, data []byte, sig []byte) error {
-	session, err := OpenSession()
-	if err != nil {
-		return err
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 	defer CloseSession(session)
 
+	pub, err := PublicKeyUmmarshal(pubKey)
+	if err != nil {
+		return err
+	}
+
 	// 对数据预处理,使用默认用户ID
-	err = Sm3InitWithPubKey(session, pubKey, defaultID)
-	if err != nil {
-		return err
+	ret = HashInit(session, SGD_SM3, &pub, defaultID)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
-	err = HashUpdate(session, data)
-	if err != nil {
-		return err
+	ret = HashUpdate(session, data)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
-	hash, err := HashFinal(session)
-	if err != nil {
-		return err
+	hash, ret := HashFinal(session)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
 	return Sm2PubkeyVerify(session, pubKey, hash, sig)
@@ -133,15 +142,15 @@ func Sm2PubkeyVerifyData(pubKey []byte, data []byte, sig []byte) error {
 
 // Sm2ExportEncPublicKey:导出加密公钥,返回04||x||y格式
 func Sm2ExportEncPublicKey(keyIndex uint32) ([]byte, error) {
-	session, err := OpenSession()
-	if err != nil {
-		return nil, err
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 	defer CloseSession(session)
 
-	pubKey, err := ExportEncPublicKeyECC(session, keyIndex)
-	if err != nil {
-		return nil, err
+	pubKey, ret := ExportEncPublicKeyECC(session, keyIndex)
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 
 	return PublicKeyMarshal(pubKey), nil
@@ -149,9 +158,9 @@ func Sm2ExportEncPublicKey(keyIndex uint32) ([]byte, error) {
 
 // Sm2Encrypt:使用公钥加密
 func Sm2Encrypt(pubKey []byte, data []byte) ([]byte, error) {
-	session, err := OpenSession()
-	if err != nil {
-		return nil, err
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 	defer CloseSession(session)
 
@@ -160,9 +169,9 @@ func Sm2Encrypt(pubKey []byte, data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	cipherEcc, err := ExternalEncryptECC(session, pub, data)
-	if err != nil {
-		return nil, err
+	cipherEcc, ret := ExternalEncryptECC(session, pub, data)
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 
 	cipher, err := CipherMarshal(cipherEcc)
@@ -173,11 +182,12 @@ func Sm2Encrypt(pubKey []byte, data []byte) ([]byte, error) {
 	return cipher, nil
 }
 
-// Sm2InternalSign:内部ECC签名私钥签名,生成ASN.1格式签名
+// Sm2InternalSign:内部ECC签名私钥签名,需要先对数据预处理,生成ASN.1格式签名
 func Sm2InternalSign(session HANDLE, keyIndex uint32, hash []byte) ([]byte, error) {
-	sig, err := InternalSignECC(session, keyIndex, hash)
-	if err != nil {
-		return nil, err
+	// 获取私钥使用权限?
+	sig, ret := InternalSignECC(session, keyIndex, hash)
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 
 	sm2Sig, err := SignatureMarshal(sig)
@@ -190,32 +200,32 @@ func Sm2InternalSign(session HANDLE, keyIndex uint32, hash []byte) ([]byte, erro
 
 // Sm2SignData:内部ECC签名私钥签名,直接对数据进行签名.返回ASN.1格式签名
 func Sm2SignData(keyIndex uint32, data []byte) ([]byte, error) {
-	session, err := OpenSession()
-	if err != nil {
-		return nil, err
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 	defer CloseSession(session)
 
 	// 导出内部公钥用于预处理
-	signPub, err := ExportSignPublicKeyECC(session, keyIndex)
-	if err != nil {
-		return nil, err
+	signPub, ret := ExportSignPublicKeyECC(session, keyIndex)
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 
 	// 对数据预处理,使用默认用户ID
-	err = HashInit(session, SGD_SM3, &signPub, defaultID)
-	if err != nil {
-		return nil, err
+	ret = HashInit(session, SGD_SM3, &signPub, defaultID)
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 
-	err = HashUpdate(session, data)
-	if err != nil {
-		return nil, err
+	ret = HashUpdate(session, data)
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 
-	hash, err := HashFinal(session)
-	if err != nil {
-		return nil, err
+	hash, ret := HashFinal(session)
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 
 	// 对HASH签名
@@ -228,37 +238,42 @@ func Sm2InternalVerify(session HANDLE, keyIndex uint32, hash []byte, sig []byte)
 	if err != nil {
 		return err
 	}
-	return InternalVerifyECC(session, keyIndex, hash, sm2Sig)
+
+	if ret := InternalVerifyECC(session, keyIndex, hash, sm2Sig); ret != SDR_OK {
+		return ret.Error()
+	}
+
+	return nil
 }
 
 // Sm2VerifyData:内部ECC签名公钥验签,直接对数据进行验证,输入ASN.1格式签名
 func Sm2VerifyData(keyIndex uint32, data, sig []byte) error {
-	session, err := OpenSession()
-	if err != nil {
-		return err
+	session, ret := OpenSession()
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 	defer CloseSession(session)
 
 	// 导出内部公钥用于预处理
-	signPub, err := ExportSignPublicKeyECC(session, keyIndex)
-	if err != nil {
-		return err
+	signPub, ret := ExportSignPublicKeyECC(session, keyIndex)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
 	// 对数据预处理,使用默认用户ID
-	err = HashInit(session, SGD_SM3, &signPub, defaultID)
-	if err != nil {
-		return err
+	ret = HashInit(session, SGD_SM3, &signPub, defaultID)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
-	err = HashUpdate(session, data)
-	if err != nil {
-		return err
+	ret = HashUpdate(session, data)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
-	hash, err := HashFinal(session)
-	if err != nil {
-		return err
+	hash, ret := HashFinal(session)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
 	// 对HASH签名验签

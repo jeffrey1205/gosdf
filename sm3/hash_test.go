@@ -11,12 +11,13 @@ import (
 var enginePath string = "./libsdf_crypto.so"
 
 func TestSm3Hash(t *testing.T) {
-	if err := gosdf.Init(enginePath); err != nil {
-		fmt.Println("SDF init error:", err)
+	if err := gosdf.Init(enginePath); err != gosdf.SDR_OK {
+		fmt.Println("SDF init error:", err.Error())
 		return
 	}
 	defer gosdf.Exit()
 
+	//55E12E91650D2FEC56EC74E1D3E4DDBFCE2EF3A65890C2A19ECF88A307E76A23
 	sm3 := New()
 	sm3.Write([]byte("test"))
 	fmt.Printf("SM3 Hash: %x\n", sm3.Sum(nil))
@@ -24,8 +25,8 @@ func TestSm3Hash(t *testing.T) {
 }
 
 func TestHmacSm3(t *testing.T) {
-	if err := gosdf.Init(enginePath); err != nil {
-		fmt.Println("SDF Init error:", err)
+	if err := gosdf.Init(enginePath); err != gosdf.SDR_OK {
+		fmt.Println("SDF Init error:", err.Error())
 		return
 	}
 	defer gosdf.Exit()

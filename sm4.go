@@ -17,10 +17,12 @@ type BlockCrypter struct {
 var zeroIV = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
-// NewCrypter:新建一个分组模式加密器
+// NewCrypter:新建一个分组模式加密器.
+// 单包计算时,建议填充,否则可能出错. ECB/CBC多包加密、解密时,最后一次填充.CTR/CFB/OFB不填充
+// 多包MAC时,先手动填充
 func NewCrypter(mode ALGID, blockSize uint, pad bool) *BlockCrypter {
-	session, err := OpenSession()
-	if err != nil {
+	session, ret := OpenSession()
+	if ret != SDR_OK {
 		return nil
 	}
 
@@ -56,9 +58,9 @@ func (c *BlockCrypter) Destroy() {
 
 // GenerateKey:使用内部密钥生成会话密钥,用SM4-ECB加密
 func (c *BlockCrypter) NewKey(kek uint32) error {
-	key, handle, err := GenerateKeyWithKEK(c.session, kek, SM4_ECB, uint32(c.blockSize)*8)
-	if err != nil {
-		return err
+	key, handle, ret := GenerateKeyWithKEK(c.session, kek, SM4_ECB, uint32(c.blockSize)*8)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
 	c.keyHandle = handle
@@ -68,9 +70,9 @@ func (c *BlockCrypter) NewKey(kek uint32) error {
 
 // SetKey:import会话密钥
 func (c *BlockCrypter) SetKey(kek uint32, key []byte) error {
-	handle, err := ImportKeyWithKEK(c.session, kek, SM4_CBC, key)
-	if err != nil {
-		return err
+	handle, ret := ImportKeyWithKEK(c.session, kek, SM4_CBC, key)
+	if ret != SDR_OK {
+		return ret.Error()
 	}
 
 	c.keyHandle = handle
@@ -87,7 +89,11 @@ func (c *BlockCrypter) Encrypt(iv, plain []byte) ([]byte, error) {
 		iv = zeroIV
 	}
 
-	return Encrypt(c.session, c.keyHandle, c.mode, iv, plain)
+	if cipher, ret := Encrypt(c.session, c.keyHandle, c.mode, iv, plain); ret != SDR_OK {
+		return nil, ret.Error()
+	} else {
+		return cipher, nil
+	}
 }
 
 // Decrypt:解密，CBC等需要IV、Nonce模式须16字节IV,ECB可不填
@@ -96,22 +102,31 @@ func (c *BlockCrypter) Decrypt(iv, cipher []byte) ([]byte, error) {
 		iv = zeroIV
 	}
 
-	plainText, err := Decrypt(c.session, c.keyHandle, c.mode, iv, cipher)
-	if err != nil {
-		return nil, err
+	plainText, ret := Decrypt(c.session, c.keyHandle, c.mode, iv, cipher)
+	if ret != SDR_OK {
+		return nil, ret.Error()
 	}
 
 	if c.pad { // 此处有可能没有填充
 		plainText, _ = c.p7pad.Unpad(plainText)
 	}
-	return plainText, err
+	return plainText, nil
 }
 
 // CBCMAC:CBC-MAC,此函数为单包计算,若要多包计算,使用IV进行控制
-// CBC-MAC在长度不固定时有长度扩展攻击问题.使用ISO9797-1 M3填充方式抵御攻击
+// CBC-MAC在长度不固定时有长度扩展攻击问题.
+// 单包计算时,使用ISO9797-1 M3填充方式抵御攻击.多包计算先填充再计算
 func (c *BlockCrypter) CBCMAC(iv []byte, data []byte) ([]byte, error) {
+	var mac []byte
+	var ret RV
+
 	if c.pad {
-		return CalculateMAC(c.session, c.keyHandle, c.mode, iv, c.m3pad.Pad(data))
+		mac, ret = CalculateMAC(c.session, c.keyHandle, c.mode, iv, c.m3pad.Pad(data))
 	}
-	return CalculateMAC(c.session, c.keyHandle, c.mode, iv, data)
+	mac, ret = CalculateMAC(c.session, c.keyHandle, c.mode, iv, data)
+
+	if ret != SDR_OK {
+		return nil, ret.Error()
+	}
+	return mac, nil
 }

@@ -20,12 +20,12 @@ func (sm3 *SM3) Close() {
 // 创建哈希计算实例
 func New() hash.Hash {
 	session, err := sdf.OpenSession()
-	if err != nil {
-		panic("open session error: " + err.Error())
+	if err != sdf.SDR_OK {
+		panic(err.Error())
 	}
 
-	if err := sdf.Sm3Init(session); err != nil {
-		panic(fmt.Sprintf("session %x init error: %v", session, err))
+	if err := sdf.HashInit(session, sdf.SGD_SM3, nil, nil); err != sdf.SDR_OK {
+		panic(err.Error())
 	}
 
 	sm3 := &SM3{session: session}
@@ -47,7 +47,7 @@ func (sm3 *SM3) Reset() {
 }
 
 func (sm3 *SM3) Write(p []byte) (int, error) {
-	if err := sdf.HashUpdate(sm3.session, p); err != nil {
+	if err := sdf.HashUpdate(sm3.session, p); err != sdf.SDR_OK {
 		return 0, fmt.Errorf("sm3 update error: %v", err.Error())
 	}
 
@@ -60,7 +60,7 @@ func (sm3 *SM3) Sum(in []byte) []byte {
 	}
 
 	hash, err := sdf.HashFinal(sm3.session)
-	if err != nil {
+	if err != sdf.SDR_OK {
 		panic(fmt.Sprintf("session %x final error: %v", sm3.session, err))
 	}
 
