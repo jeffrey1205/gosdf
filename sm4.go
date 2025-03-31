@@ -127,8 +127,9 @@ func (c *BlockCrypter) CBCMAC(iv []byte, data []byte) ([]byte, error) {
 
 	if c.pad {
 		mac, ret = CalculateMAC(c.session, c.keyHandle, c.mode, iv, c.m3pad.Pad(data))
+	} else {
+		mac, ret = CalculateMAC(c.session, c.keyHandle, c.mode, iv, data)
 	}
-	mac, ret = CalculateMAC(c.session, c.keyHandle, c.mode, iv, data)
 
 	if ret != SDR_OK {
 		return nil, ret.Error()
