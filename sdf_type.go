@@ -1,13 +1,12 @@
 package gosdf
 
-import (
-	"fmt"
-	"math/big"
-)
+import "fmt"
 
 // 数据类型
-type HANDLE *int
-type ALGID uint32
+type (
+	HANDLE *int
+	ALGID  uint32
+)
 
 // 算法标识
 const (
@@ -24,7 +23,8 @@ const (
 	SM4_OFB ALGID = 0x00000408
 	SM4_MAC ALGID = 0x00000410
 	SM4_CTR ALGID = 0x00000420
-	SM4_XTS ALGID = 0x00000440
+	SM4_GCM ALGID = 0x02000400 // SGD_SM4_GCM,GMT 0006-2023 表1(2012 时代厂商 sdf.h 定义同值)
+	SM4_CCM ALGID = 0x04000400 // SGD_SM4_CCM,GMT 0006-2023 表1(2012 时代厂商 sdf.h 定义同值)
 
 	SM7_ECB ALGID = 0x00001001
 	SM7_CBC ALGID = 0x00001002
@@ -40,14 +40,30 @@ const (
 	AES_MAC ALGID = 0x00008010
 	AES_CTR ALGID = 0x00008020
 
-	SGD_SM3    ALGID = 0x00000001
-	SGD_SHA1   ALGID = 0x00000002
-	SGD_SHA256 ALGID = 0x00000004
-	SGD_SHA512 ALGID = 0x00000008
-	SGD_SHA384 ALGID = 0x00000010
-	SGD_SHA224 ALGID = 0x00000020
-	SGD_MD5    ALGID = 0x00000080
+	// 杂凑/HMAC 标识:GMT 0006-2023 表3。SDF_HashInit/SDF_HMACInit 的 uiAlgID
+	// 为杂凑算法标识(SGD_SM3/SGD_SHA256);SGD_SM3_HMAC/SGD_SHA256_HMAC 为
+	// GMT 0006 定义的 HMAC 算法标识。2012 时代 sdf.h:365-371 的
+	// SHA1/SHA224/SHA512/SHA384/MD5 已废弃,不再定义。
+	SGD_SM3         ALGID = 0x00000001
+	SGD_SHA256      ALGID = 0x00000004
+	SGD_SM3_HMAC    ALGID = 0x00000008
+	SGD_SHA256_HMAC ALGID = 0x00000010
+
+	SGD_SM2   ALGID = 0x00020100 // SM2算法
+	SGD_SM2_1 ALGID = 0x00020200 // SM2签名
+	SGD_SM2_2 ALGID = 0x00020400 // SM2密钥交换
+	SGD_SM2_3 ALGID = 0x00020800 // SM2加密
 )
+
+// BlockSize 返回对称算法的分组长度:SM1/SM4/SM7/AES 系列(含 MAC/CTR 等模式变体)为 16,
+// 其余(杂凑、SM2、RSA 等,以及 GCM/CCM 等流式 AEAD 模式无分组语义)返回 0。
+func (a ALGID) BlockSize() int {
+	switch a & 0xFFFFFF00 {
+	case 0x00000100, 0x00000400, 0x00001000, 0x00008000:
+		return 16
+	}
+	return 0
+}
 
 // 错误码定义
 type RV uint32
@@ -85,71 +101,104 @@ const (
 	SDR_NOBUFFER         RV = SDR_BASE + 0x0000001C // 存储空间不足
 	SDR_INARGERR         RV = SDR_BASE + 0x0000001D // 输入参数错误
 	SDR_OUTARGERR        RV = SDR_BASE + 0x0000001E // 输出参数错误
+	SDR_USERIDERR        RV = SDR_BASE + 0x0000001F // 用户标识错误(2023 附录 A)
 )
 
-func (rv RV) Error() error {
-	return fmt.Errorf("SGD Error code: %x", rv)
+// Error 实现 error 接口,RV 即设备错误值。
+func (rv RV) Error() string {
+	return fmt.Sprintf("SGD error 0x%08x", uint32(rv))
+}
+
+// rvErr 将设备错误码包装为带操作名的 error,支持 errors.Is/As。
+func rvErr(op string, rv RV) error {
+	return fmt.Errorf("gosdf: %s: %w", op, rv)
+}
+
+// argErr 参数校验失败,统一包装 SDR_INARGERR。
+func argErr(op string) error {
+	return rvErr(op, SDR_INARGERR)
+}
+
+// padLeft 将 src 右对齐拷入定长 dst,左侧补零。
+// src 超过 dst 长度时报 SDR_INARGERR。
+func padLeft(dst, src []byte) error {
+	if len(src) > len(dst) {
+		return argErr("padLeft")
+	}
+	clear(dst)
+	copy(dst[len(dst)-len(src):], src)
+	return nil
 }
 
 const (
-	ECCref_MAX_BITS              int32 = 512
-	ECCref_MAX_LEN               int32 = ((ECCref_MAX_BITS + 7) / 8)
-	ECCref_MAX_CIPHER_LEN        int32 = 128
-	ECC_MAX_XCOORDINATE_BITS_LEN int32 = 512
-	ECC_MAX_YCOORDINATE_BITS_LEN int32 = ECC_MAX_XCOORDINATE_BITS_LEN
-	ECC_MAX_MODULUS_BITS_LEN     int32 = ECC_MAX_XCOORDINATE_BITS_LEN
+	ECCref_MAX_BITS       int32 = 512
+	ECCref_MAX_LEN        int32 = ((ECCref_MAX_BITS + 7) / 8)
+	ECCref_MAX_CIPHER_LEN int32 = 136 // 密文内容 C 的字节上限(ECCref_MAX_CIPHER_LEN=136,2012 时代厂商 sdf.h 的 ECCCipher.C 容量)
 )
 
-const Sm4BlockSize int = 16
-const Sm3HashSize int = 32
+// RSAref_* 对应 sdf.h RSA 密钥结构位长上限:模数 2048 位、素因子 1024 位。
+const (
+	RSAref_MAX_BITS  int32 = 2048
+	RSAref_MAX_LEN   int32 = ((RSAref_MAX_BITS + 7) / 8)
+	RSAref_MAX_PBITS int32 = ((RSAref_MAX_BITS + 1) / 2)
+	RSAref_MAX_PLEN  int32 = ((RSAref_MAX_PBITS + 7) / 8)
+)
 
-type ECCrefPublicKey struct {
+const (
+	Sm4BlockSize int = 16
+	Sm3HashSize  int = 32
+)
+
+// ECCrefPublicKey 对应 sdf.h ECCrefPublicKey(bits + X + Y,132 字节)。
+type eccRefPublicKey struct {
 	Bits uint32
 	X    [ECCref_MAX_LEN]byte
 	Y    [ECCref_MAX_LEN]byte
 }
 
-type ECCrefPrivateKey struct {
+// eccRefPrivateKey 对应 sdf.h ECCrefPrivateKey(privFromECC/GenerateKeyPairECC 使用的私钥布局)。
+type eccRefPrivateKey struct {
 	Bits uint32
 	K    [ECCref_MAX_LEN]byte
 }
 
-// ECC加密结果. GM/T 0018格式
-type ECCCipher struct {
-	X [ECCref_MAX_LEN]byte
-	Y [ECCref_MAX_LEN]byte
-	M [Sm3HashSize]byte
-	L uint32                      // 密文长度,单位字节
-	C [ECCref_MAX_CIPHER_LEN]byte // 密文内容,更长的加密需求使用数字信封
-}
-
-type sm2Cipher struct {
-	X          *big.Int
-	Y          *big.Int
-	HASH       []byte
-	CipherText []byte
-}
-
-// 数字签名结果. GM/T 0018格式
-type ECCSignature struct {
+// eccSignature 对应 sdf.h ECCSignature(R||S 各 64 字节)。
+type eccSignature struct {
 	R [ECCref_MAX_LEN]byte
 	S [ECCref_MAX_LEN]byte
 }
 
-type sm2Signature struct {
-	R, S *big.Int
+// rsaRefPublicKey 对应 sdf.h RSArefPublicKey(bits+m+e,共 516 字节):
+// bits@0(uint32)、m@4、e@260;模数与指数为无符号大端定长数组(左补零)。
+type rsaRefPublicKey struct {
+	Bits uint32
+	M    [RSAref_MAX_LEN]byte
+	E    [RSAref_MAX_LEN]byte
 }
 
-type ECCPUBLICKEYBLOB struct {
-	BitLen      uint32
-	XCoordinate [ECC_MAX_XCOORDINATE_BITS_LEN / 8]byte
-	YCoordinate [ECC_MAX_YCOORDINATE_BITS_LEN / 8]byte
+// rsaRefPrivateKey 对应 sdf.h RSArefPrivateKey(共 1412 字节):
+// bits@0(uint32)、m@4、e@260、d@516、prime@772(2×128)、pexp@1028(2×128)、
+// coef@1284;均为无符号大端定长数组(左补零),CRT 参数
+// prime=[P|Q]、pexp=[dP|dQ]、coef=[qInv]。
+type rsaRefPrivateKey struct {
+	Bits  uint32
+	M     [RSAref_MAX_LEN]byte
+	E     [RSAref_MAX_LEN]byte
+	D     [RSAref_MAX_LEN]byte
+	Prime [2][RSAref_MAX_PLEN]byte
+	Pexp  [2][RSAref_MAX_PLEN]byte
+	Coef  [RSAref_MAX_PLEN]byte
 }
 
-type ECCCIPHERBLOB struct {
-	XCoordinate [ECC_MAX_XCOORDINATE_BITS_LEN / 8]byte
-	YCoordinate [ECC_MAX_XCOORDINATE_BITS_LEN / 8]byte
-	Hash        [Sm3HashSize]byte
-	CipherLen   uint32
-	Cipher      [ECCref_MAX_CIPHER_LEN]byte
+// DeviceInfo 设备信息,对应 sdf.h DEVICEINFO(字符串为去尾部 NUL 的 C 字节串)。
+type DeviceInfo struct {
+	IssuerName      string // 生产厂商名称
+	DeviceName      string // 设备型号
+	DeviceSerial    string // 设备序列号
+	DeviceVersion   uint32 // 设备实现版本
+	StandardVersion uint32 // 符合的标准版本
+	AsymAlgAbility  [2]uint32
+	SymAlgAbility   uint32 // 对称算法能力
+	HashAlgAbility  uint32 // 杂凑算法能力
+	BufferSize      uint32 // 设备可接收的最大数据长度
 }
