@@ -1,12 +1,12 @@
 # gosdf — GM/T 0018 密码设备 SDF 接口的 Go 封装
 
-`gitee.com/zhujingfeng/gosdf`
+`github.com/jeffrey1205/gosdf`
 
 通过 cgo + dlopen 加载设备动态库(厂商硬件 `.so` 或 SoftSDF 软件模拟器),接口形态贴近
 Go 原生 crypto API。按 GM/T 0018-2023 实现并兼容 2012 版函数集。
 
 ```sh
-go get gitee.com/zhujingfeng/gosdf
+go get github.com/jeffrey1205/gosdf
 ```
 
 ```go

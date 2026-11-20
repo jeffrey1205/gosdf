@@ -24,7 +24,7 @@ import (
 	"github.com/emmansun/gmsm/sm3"
 	"github.com/emmansun/gmsm/sm4"
 
-	"gitee.com/zhujingfeng/gosdf"
+	"github.com/jeffrey1205/gosdf"
 )
 
 const (
